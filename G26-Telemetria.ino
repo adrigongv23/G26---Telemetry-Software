@@ -1,48 +1,52 @@
-#include "include/data_processor.hpp"
+
+#include <Arduino.h>
+#include <SPI.h>
+#include "SdFat.h"
 #include "include/can.hpp"
-#include "include/g24_wheel_buttons.hpp"
-#include "include/led_strip.hpp"
-#include "include/crowpanel_controller.hpp"
+#include "include/data_processor.hpp"
 
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
+// --- CONFIGURACIÓN SD (VSPI) ---
+#define SD_CS_PIN 5
+#define SPI_CLOCK SD_SCK_MHZ(20)
+SdFat sd;
+SdFile logFile;
 
-DataProcessor dataProcessor;
-CAN canController;
-G24WheelButtons wheelButtons;
-LedStrip ledStrip;
-CrowPanelController crowPanelController;
-
-// Screen rotation variables
-unsigned long lastScreenChange = 0;
-int currentScreen = 1;
-int screenCycle = 0; // 0 = screen1, 1 = screen2, 2 = screen3, 3 = screen4
+// Instancias
+CAN can_interface;
+DataProcessor processor;
 
 void setup() {
     Serial.begin(115200);
-    while (!Serial) { delay(10); }
-    Serial.println("Starting setup...");
-    canController.set_data_proccessor(&dataProcessor);
-    dataProcessor.set_led_strip(&ledStrip);
-    dataProcessor.set_crow_panel_controller(&crowPanelController);
-    // wheelButtons.set_led_strip(&ledStrip);
-    // wheelButtons.set_can_controller(&canController);
-    // wheelButtons.set_data_processor(&dataProcessor);
-    // ledStrip.set_mutex(canController.get_mutex());
+    delay(1000);
+    Serial.println("\n--- G26 TELEMETRY: INICIO DE SISTEMA ---");
 
-    canController.start();
-    canController.start_listening_task();
-    
+    // 1. INICIALIZACIÓN SD
+    if (!sd.begin(SD_CS_PIN, SPI_CLOCK)) {
+        Serial.println("[FALLO] SD no detectada. El sistema continuará sin Datalogging.");
+    } else {
+        Serial.println("[OK] SD Montada.");
+        if (!logFile.exists("G26.csv")) {
+             if (logFile.open("G26.csv", O_RDWR | O_CREAT | O_AT_END)) {
+                 // SOLO Cabeceras de lo que vamos a grabar ahora
+                 logFile.println("Time,ECT"); 
+                 logFile.close();
+             }
+        }
+    }
 
-    // wheelButtons.begin();
-   
-    // xTaskCreate(wheelButtons.updateTask, "updateTask", 4096, &wheelButtons, 1, NULL);
+    // 2. VINCULACIÓN
+    // Le damos al procesador acceso a la SD para que guarde cuando lleguen datos
+    processor.setLogSystem(&sd, &logFile);
+    can_interface.set_data_proccessor(&processor);
+
+    // 3. INICIO CAN
+    can_interface.start();
+    can_interface.start_listening_task(); // Escucha en Core 1 (Background)
     
-    // Initialize with screen 1
-    lastScreenChange = millis();
+    Serial.println("[OK] Sistema ONLINE.");
 }
 
-void loop(){ 
-    lv_timer_handler();
-    vTaskDelay(5);
+void loop() {
+    
+    delay(100); 
 }
