@@ -145,18 +145,20 @@ void DataProcessor::send_serial_frame_4(int dig3, int dig4, int dig5, int dig6, 
 }
 
 // ESCRITURA EN SD 
-void DataProcessor::flushToSD() {
-    // Solo escribe si la tarjeta está lista
-    if (_sd && _logFile && _sd->card()) {
-        
-        // Modo APPEND
-        if (_logFile->open("G26.csv", O_RDWR | O_CREAT | O_AT_END)) {
-            
-            _logFile->print(millis());      
-            _logFile->print(",");
-            _logFile->println(car.ect);       
 
-            _logFile->close(); 
-        }
+void DataProcessor::flushToSD() {
+    // Verificamos que los punteros existan Y que el archivo esté abierto
+    if (_sd && _logFile && _logFile->isOpen()) {
+            
+        // 1. Escribimos los datos 
+        _logFile->print(millis());      
+        _logFile->print(",");
+        _logFile->println(car.ect);       
+
+        // 2. SYNC
+        // Esto fuerza a la SD a guardar físicamente los datos AHORA MISMO,
+        // pero mantiene el archivo abierto para la siguiente vuelta.
+        _logFile->sync(); 
+        
     }
 }

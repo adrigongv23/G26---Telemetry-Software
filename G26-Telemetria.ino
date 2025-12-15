@@ -24,14 +24,19 @@ void setup() {
     if (!sd.begin(SD_CS_PIN, SPI_CLOCK)) {
         Serial.println("[FALLO] SD no detectada. El sistema continuará sin Datalogging.");
     } else {
-        Serial.println("[OK] SD Montada.");
-        if (!logFile.exists("G26.csv")) {
-             if (logFile.open("G26.csv", O_RDWR | O_CREAT | O_AT_END)) {
-                 // SOLO Cabeceras de lo que vamos a grabar ahora
-                 logFile.println("Time,ECT"); 
-                 logFile.close();
-             }
+        if (logFile.open("G26.csv", O_RDWR | O_CREAT | O_APPEND)) {
+
+        // Si el archivo es nuevo (tamaño 0), escribimos la cabecera
+        if (logFile.size() == 0) {
+            logFile.println("Time,ECT");
         }
+
+        // El archivo se queda abierto y listo.
+        Serial.println("[OK] Archivo abierto");
+        
+    } else {
+        Serial.println("[ERROR] No se pudo abrir el archivo G26.csv");
+    }
     }
 
     // 2. VINCULACIÓN
