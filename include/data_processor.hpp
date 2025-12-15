@@ -9,6 +9,11 @@ class DataProcessor {
 public:
     DataProcessor() = default;
 
+    // Estructura de datos
+    struct CarState {
+        int ect = 0;     // Temperatura (IMPORTANTE POR AHORA). Luego habría que añadir aquí todas las variables que se vallan a guardar.
+    };
+
     // Configuración SD
     void setLogSystem(SdFat* sd_inst, SdFile* file_inst) {
         _sd = sd_inst;
