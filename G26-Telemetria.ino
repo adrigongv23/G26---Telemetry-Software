@@ -1,9 +1,10 @@
-
 #include <Arduino.h>
 #include <SPI.h>
 #include "SdFat.h"
+
 #include "include/can.hpp"
 #include "include/data_processor.hpp"
+
 
 // --- CONFIGURACIÓN SD (VSPI) ---
 #define SD_CS_PIN 5

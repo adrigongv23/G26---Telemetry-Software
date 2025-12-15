@@ -1,9 +1,7 @@
 #ifndef DATAPROCESSOR_HPP
 #define DATAPROCESSOR_HPP
 
-#include <Arduino.h>
-#include "SdFat.h"
-#include <vector>
+#include "common/common_libraries.hpp"
 
 class DataProcessor {
 public:
