@@ -150,15 +150,18 @@ void DataProcessor::flushToSD() {
     // Verificamos que los punteros existan Y que el archivo esté abierto
     if (_sd && _logFile && _logFile->isOpen()) {
             
-        // 1. Escribimos los datos 
+// 1. Escribimos al BUFFER (RAM) - Esto es instantáneo (microsegundos)
         _logFile->print(millis());      
         _logFile->print(",");
         _logFile->println(car.ect);       
 
-        // 2. SYNC
-        // Esto fuerza a la SD a guardar físicamente los datos AHORA MISMO,
-        // pero mantiene el archivo abierto para la siguiente vuelta.
-        _logFile->sync(); 
-        
+        // 2. SYNC CONTROLADO 
+        // Solo obligamos a la tarjeta a "escribir de verdad" si ha pasado X tiempo.
+        // Esto evita detener el CAN cada 10ms.
+        if (millis() - _last_sync_time > _sync_interval_ms) {
+            _logFile->sync(); // Aquí sí gastamos tiempo, pero solo 1 vez por segundo
+            _last_sync_time = millis();
+            // Serial.println("[SD] Sync realizado"); // Descomentar solo para debug
+        }
     }
 }

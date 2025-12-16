@@ -30,6 +30,10 @@ private:
     SdFile* _logFile;
     CarState car;
 
+    uint32_t _last_sync_time = 0; 
+    const uint32_t _sync_interval_ms = 1000; // Guardar físicamente cada 1 segundo (ajustable)
+                                             // Esto optimiza tiempos. Los datos se guardan a la velocidad del CAN en RAM y cada 1 segundo se vuelcan a la SD. Cosa mucho más optima ya que la SD es relativamente lenta comparada al CAN
+
     void flushToSD(); // Guardado físico
 };
 
