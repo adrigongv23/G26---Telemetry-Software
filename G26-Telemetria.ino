@@ -30,6 +30,7 @@ void setup() {
         // Si el archivo es nuevo (tamaño 0), escribimos la cabecera
         if (logFile.fileSize() == 0) {
             logFile.println("Time,ECT");
+            logFile.sync();
         }
 
         // El archivo se queda abierto y listo.
