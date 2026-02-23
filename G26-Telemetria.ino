@@ -17,7 +17,7 @@ CAN can_interface;
 DataProcessor processor;
 
 void setup() {
-    Serial.begin(115200);
+    Serial.begin(2000000);
     delay(1000);
     Serial.println("\n--- G26 TELEMETRY: INICIO DE SISTEMA ---");
 
