@@ -28,7 +28,7 @@ void setup() {
         if (logFile.open("G26.csv", O_RDWR | O_CREAT | O_APPEND)) {
 
         // Si el archivo es nuevo (tamaño 0), escribimos la cabecera
-        if (logFile.size() == 0) {
+        if (logFile.fileSize() == 0) {
             logFile.println("Time,ECT");
         }
 
