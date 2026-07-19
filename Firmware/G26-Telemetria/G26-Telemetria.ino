@@ -8,10 +8,6 @@ CAN canController;
 // Objeto UDP para manejar la conexión UDP
 WiFiUDP udp; 
 
-//Configuración destino
-//Se debe de poner la IP del portatil trás conectar al Wifi del móvil
-const char* pc_ip = "192.168.43.155"; //Pongo una de prueba
-
 //Envio de datos a través de UDP
 void TaskUdpSender(void *pvParameters){
 
@@ -28,10 +24,10 @@ void TaskUdpSender(void *pvParameters){
       //Pasamos el dato actual a mensaje para enviarlo 
       String mensaje = String(tempActual) + "|" + String(rpmActual) + "|" + String(battActual, 1);
 
-      //Enviamos el paquete a través de UDP
-      udp.beginPacket(pc_ip, UDP_PORT); 
-      udp.print(mensaje);               
-      udp.endPacket();        
+      //Enviamos el paquete por broadcast a toda la red local (no hace falta conocer la IP del portátil)
+      udp.beginPacket(IPAddress(255,255,255,255), UDP_PORT);
+      udp.print(mensaje);
+      udp.endPacket();
       
       //Para comprobar que el paquete se está enviado correctamente podemos usar estos prints
       //Serial.print("UDP Enviado: ");

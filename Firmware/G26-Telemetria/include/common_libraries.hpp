@@ -11,8 +11,8 @@
 #include <WifiUdp.h>
 
 //CONFIGURACIÓN WIFI Y FIREBASE 
-#define WIFI_SSID "test" 
-#define WIFI_PASSWORD "12345678"
+#define WIFI_SSID "FGades"
+#define WIFI_PASSWORD "GadesCPE"
 
 //CONFIGURACIÓN WIFI Y FIREBASE
 #define UDP_PORT 4210
