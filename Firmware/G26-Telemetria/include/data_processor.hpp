@@ -13,7 +13,7 @@ public:
     //Variable publica para el CAN
     volatile int current_ect_value = 0; 
     volatile int current_rpm_value = 0;
-    volatile float current_vbatt_value = 0.0
+    volatile float current_vbatt_value = 0.0;
 
     //Métodos de recepción de CAN
    

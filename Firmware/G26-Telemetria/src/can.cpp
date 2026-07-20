@@ -11,7 +11,7 @@ static bool driver_installed = false;
 void CAN::start() {
     Serial.println("Starting CAN Controller...");
     twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT((gpio_num_t)TX_PIN, (gpio_num_t)RX_PIN, TWAI_MODE_NORMAL);
-    twai_timing_config_t t_config = TWAI_TIMING_CONFIG_125KBITS();
+    twai_timing_config_t t_config = TWAI_TIMING_CONFIG_500KBITS();
     twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
 
     esp_err_t install_status = twai_driver_install(&g_config, &t_config, &f_config);

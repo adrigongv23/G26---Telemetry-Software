@@ -56,8 +56,18 @@ void setup() {
     canController.start();
     canController.start_listening_task();
     
-    // 2. INICIAR WIFI 
+    // 2. INICIAR WIFI
     Serial.println("--- CONECTANDO WIFI ---");
+
+    //IP estática dentro de la red del CPE (DHCP desactivado en el CPE)
+    IPAddress local_IP(192, 168, 0, 50);
+    IPAddress gateway(192, 168, 0, 254);
+    IPAddress subnet(255, 255, 255, 0);
+
+    if (!WiFi.config(local_IP, gateway, subnet)) {
+        Serial.println("[ERR] Fallo al configurar IP estática");
+    }
+
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
     int intentos = 0;

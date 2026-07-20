@@ -24,11 +24,11 @@ void DataProcessor::send_serial_frame_0(int rpmh, int rpml, int tpsh, int tpsl, 
     Serial.println("send_serial_frame_0");
 
     // Actualizamos las variables globales para que puedan ser leidas por el protocolo UDP
-    this -> current_ect_value = ect; 
+    this->current_ect_value = ect; 
     this->current_rpm_value = rpm;
     this->current_vbatt_value = vbatt;
 
-    // Serial.printf("CAN RX -> ECT: %d | RPM: %d | BATT: %.1f \n", ect, rpm, vbatt);;
+    Serial.printf("CAN RX -> ECT: %d | RPM: %d | BATT: %.1f \n", ect, rpm, vbatt);;
 }
 
 /*
