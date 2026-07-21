@@ -34,3 +34,7 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Grabaciones y capturas del monitor de boxes
+Escritorio_Boxes/sesiones/
+Escritorio_Boxes/capturas/
