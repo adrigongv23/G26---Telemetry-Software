@@ -6,10 +6,14 @@ void DataProcessor::send_serial_frame_0(int rpmh, int rpml, int tpsh, int tpsl, 
 
     car.ect = ect; // GUARDAR LA VARIABLE DEL FRAME EN LA ESTRUCTURA 
   
-  // El resto de variables no son relevantes ahora, se quedan comentadas para ahorrar memoria
-  //  int rpm = (rpmh * 256) + rpml; 
-  //  int tps = (tpsh * 256) + tpsl; 
-  //  double vbatt = ((vbatth * 256) + vbattl) / 100.0; 
+    int rpm = (rpmh * 256) + rpml; 
+    car.rpm = rpm;
+
+    int tps = (tpsh * 256) + tpsl; 
+    car.tps = tps;
+
+    double vbatt = ((vbatth * 256) + vbattl) / 100.0; 
+    car.vbatt = vbatt;
 
     // 2. Escribimos en la SD 
     flushToSD(); 

@@ -6,9 +6,15 @@
 #include "include/data_processor.hpp"
 
 
-// --- CONFIGURACIÓN SD (VSPI) ---
-#define SD_CS_PIN 5
-#define SPI_CLOCK SD_SCK_MHZ(20)
+// --- CONFIGURACIÓN SD (HSPI, pines de la PCB validados por esquemático) ---
+#define SD_CS    25
+#define SD_MOSI  26
+#define SD_SCK   27
+#define SD_MISO  14
+
+SPIClass spiSD(HSPI);
+#define SD_CONFIG SdSpiConfig(SD_CS, DEDICATED_SPI, SD_SCK_MHZ(1), &spiSD)
+
 SdFat sd;
 SdFile logFile;
 
@@ -22,38 +28,44 @@ void setup() {
     Serial.println("\n--- G26 TELEMETRY: INICIO DE SISTEMA ---");
 
     // 1. INICIALIZACIÓN SD
-    if (!sd.begin(SD_CS_PIN, SPI_CLOCK)) {
+    spiSD.begin(SD_SCK, SD_MISO, SD_MOSI, SD_CS);
+
+    if (!sd.begin(SD_CONFIG)) {
         Serial.println("[FALLO] SD no detectada. El sistema continuará sin Datalogging.");
     } else {
-        if (logFile.open("G26.csv", O_RDWR | O_CREAT | O_APPEND)) {
+        char filename[24];
+        int session = 1;
+        bool opened = false;
 
-        // Si el archivo es nuevo (tamaño 0), escribimos la cabecera
-        if (logFile.fileSize() == 0) {
-            logFile.println("Time,ECT");
-            logFile.sync();
+        while (!opened && session < 100000) {
+            snprintf(filename, sizeof(filename), "G26-%d.csv", session);
+            if (logFile.open(filename, O_RDWR | O_CREAT | O_EXCL)) {
+                opened = true;
+                Serial.printf("[OK] Nueva sesion: %s\n", filename);
+            } else {
+                session++;
+            }
         }
 
-        // El archivo se queda abierto y listo.
-        Serial.println("[OK] Archivo abierto");
-        
-    } else {
-        Serial.println("[ERROR] No se pudo abrir el archivo G26.csv");
-    }
+        if (opened) {
+            logFile.println("Time,ECT,RPM,TPS,VBATT");
+            logFile.sync();
+        } else {
+            Serial.println("[ERROR] No se pudo abrir archivo de sesion");
+        }
     }
 
     // 2. VINCULACIÓN
-    // Le damos al procesador acceso a la SD para que guarde cuando lleguen datos
     processor.setLogSystem(&sd, &logFile);
     can_interface.set_data_proccessor(&processor);
 
     // 3. INICIO CAN
     can_interface.start();
-    can_interface.start_listening_task(); // Escucha en Core 1 (Background)
-    
+    can_interface.start_listening_task();
+
     Serial.println("[OK] Sistema ONLINE.");
 }
 
 void loop() {
-    
-    delay(100); 
+    delay(100);
 }

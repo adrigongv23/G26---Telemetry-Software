@@ -9,7 +9,11 @@ public:
 
     // Estructura de datos
     struct CarState {
-        int ect = 0;     // Temperatura (IMPORTANTE POR AHORA). Luego habría que añadir aquí todas las variables que se vallan a guardar.
+        int ect = 0;    
+        int rpm = 0;
+        int tps = 0;
+        double vbatt = 0;
+
     };
 
     // Configuración SD
