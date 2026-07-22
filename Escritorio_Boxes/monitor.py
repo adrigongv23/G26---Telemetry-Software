@@ -19,30 +19,18 @@ TIMEOUT_SEG = 1.5   # Para ver si existe desconexión
 
 # --- CONFIGURACIÓN DE DATOS ---
 FRECUENCIA_HZ = 20  # Frecuencia a la que emite la ESP32 (un paquete cada 50 ms)
-VENTANA_SEG = 10    # Segundos de historia visibles en la gráfica de temperatura
+VENTANA_SEG = 10    # Segundos de historia visibles en las gráficas
 MAX_PUNTOS = FRECUENCIA_HZ * VENTANA_SEG
 
-# --- UMBRALES ---
-# Temperatura del refrigerante (ECT)
-# El rango visible cubre la escala completa: un valor fuera de escala se recortaría
-# contra el borde y pasaría por un dato normal
-ECT_MIN_VIS = 0
-ECT_MAX_VIS = 130
-ECT_FRIO = 65        # Por debajo: motor sin temperatura de trabajo
-ECT_PRECAUCION = 95  # A partir de aquí: vigilar
-ECT_CRITICO = 105    # A partir de aquí: parar
-
-# Régimen de motor
-MAX_RPM = 15000      # Fondo de escala del indicador
-RPM_CORTE = 12000    # Zona roja / corte de inyección
-
-# Tensión de batería. La escala arranca en 0: si el coche se queda sin tensión
-# hay que verlo, no que la barra se quede pegada al mínimo del indicador
-BATT_MIN_VIS = 0.0
-BATT_MAX_VIS = 16.0
-BATT_CRITICO = 11.8   # Por debajo: batería descargada
-BATT_BAJO = 12.4      # Por debajo: no está cargando bien
-BATT_SOBRECARGA = 14.8  # Por encima: el alternador se está pasando
+# --- FORMATO DEL PAQUETE UDP ---
+# Se admiten dos formatos y se distinguen solos:
+#
+#   1. "87.3|9200|14.2"   ->   ECT | RPM | BATERÍA
+#
+#   2. Nuevo (clave-valor, para cuando el firmware envíe el resto de canales):
+#        "ect=87.3;rpm=9200;vbatt=14.2;pcomb=3.6;taceite=104;paceite=4.2;
+#         map=98;lambda=0.88;lambda_obj=0.88;tps=45;marcha=3"
+CLAVES_LEGADO = ('ect', 'rpm', 'vbatt')
 
 # --- PALETA (tomada del logo oficial del equipo) ---
 FONDO = '#080D1A'      # Navy del logo llevado casi a negro
@@ -51,12 +39,74 @@ GRID = '#1C2946'       # Rejilla y separadores
 TXT = '#E9EEF8'        # Texto principal
 TXT_DIM = '#7C8AA8'    # Etiquetas secundarias
 AZUL = '#6E9BE0'       # Azul del logo, aclarado para fondo oscuro
-NARANJA = '#F08A4B'    # Naranja del logo, aclarado para fondo oscuro
 VERDE = '#35D07F'      # Semáforo: correcto
 AMBAR = '#FFB627'      # Semáforo: precaución
 ROJO = '#FF4D4D'       # Semáforo: crítico
 CIAN = '#4FC3F7'       # Motor frío
 APAGADO = '#18213A'    # Segmento / relleno inactivo
+
+# --- RÉGIMEN DE MOTOR ---
+MAX_RPM = 13000      # Fondo de escala del indicador
+RPM_CORTE = 12000    # Zona roja / corte de inyección
+
+# --- MARCHAS ---
+VALOR_NEUTRAL = 0    # Valor con el que la ECU codifica el punto muerto
+
+# --- DEFINICIÓN DE CANALES ---
+# Cada canal declara su rango visible, sus zonas de color y una referencia
+# opcional que se dibuja como línea en la gráfica. Las 'zonas' son pares
+# (límite superior, color): se recorre en orden y gana la primera que supera
+# al valor. AJUSTAR ESTOS UMBRALES A VUESTRO MOTOR.
+CANALES = {
+    'ect': dict(
+        etiqueta='ECT', descripcion='TEMP. REFRIGERANTE', unidad='°C',
+        vmin=0, vmax=130, decimales=1, referencia=None,
+        zonas=[(65, CIAN), (95, VERDE), (105, AMBAR), (float('inf'), ROJO)]),
+    'taceite': dict(
+        etiqueta='T. ACEITE', descripcion='TEMP. DE ACEITE', unidad='°C',
+        vmin=0, vmax=160, decimales=1, referencia=None,
+        zonas=[(60, CIAN), (125, VERDE), (135, AMBAR), (float('inf'), ROJO)]),
+    'pcomb': dict(
+        etiqueta='P. COMBUSTIBLE', descripcion='PRESIÓN COMBUSTIBLE', unidad='bar',
+        vmin=0, vmax=6, decimales=2, referencia=3.5,
+        zonas=[(2.5, ROJO), (3.0, AMBAR), (4.5, VERDE), (float('inf'), AMBAR)]),
+    'paceite': dict(
+        etiqueta='P. ACEITE', descripcion='PRESIÓN DE ACEITE', unidad='bar',
+        vmin=0, vmax=8, decimales=2, referencia=None,
+        zonas=[(1.0, ROJO), (2.0, AMBAR), (6.5, VERDE), (float('inf'), AMBAR)]),
+    'lambda': dict(
+        etiqueta='LAMBDA', descripcion='MEZCLA (λ)', unidad='',
+        vmin=0.70, vmax=1.30, decimales=2, referencia=1.00,
+        zonas=[(0.75, ROJO), (0.80, AMBAR), (1.02, VERDE),
+               (1.08, AMBAR), (float('inf'), ROJO)]),
+    'map': dict(
+        etiqueta='MAP', descripcion='PRESIÓN DE ADMISIÓN', unidad='kPa',
+        vmin=0, vmax=120, decimales=0, referencia=101.3,  # Presión atmosférica
+        zonas=[(float('inf'), AZUL)]),                    # Es carga, no alarma
+    'vbatt': dict(
+        etiqueta='BATERÍA', descripcion='TENSIÓN DE BATERÍA', unidad='V',
+        vmin=0, vmax=16, decimales=1, referencia=None,
+        zonas=[(11.8, ROJO), (12.4, AMBAR), (14.8, VERDE), (float('inf'), ROJO)]),
+    'tps': dict(
+        etiqueta='TPS', descripcion='ACELERADOR', unidad='%',
+        vmin=0, vmax=100, decimales=0, referencia=None,
+        zonas=[(float('inf'), AZUL)]),
+    'rpm': dict(
+        etiqueta='RPM', descripcion='RÉGIMEN DE MOTOR', unidad='',
+        vmin=0, vmax=MAX_RPM, decimales=0, referencia=None,
+        zonas=[(RPM_CORTE, VERDE), (float('inf'), ROJO)]),
+}
+
+# Canales que ocupan las tarjetas inferiores, en orden. Su posición es además la
+# tecla que lleva ese canal a la gráfica grande (1 = primera tarjeta, etc.).
+TARJETAS = ['ect', 'taceite', 'paceite', 'pcomb', 'lambda', 'map', 'vbatt']
+CANAL_FOCO_INICIAL = 'ect'
+
+# Lambda se colorea por desviación respecto al objetivo que manda la ECU, no
+# por umbrales fijos: mezcla pobre funde pistones, rica solo pierde potencia
+LAMBDA_POBRE_CRITICO = 0.06
+LAMBDA_POBRE_AVISO = 0.03
+LAMBDA_RICA_AVISO = -0.08
 
 RUTA_BASE = os.path.dirname(os.path.abspath(__file__))
 RUTA_LOGO = os.path.join(RUTA_BASE, 'logo_gades.png')
@@ -64,19 +114,18 @@ RUTA_SESIONES = os.path.join(RUTA_BASE, 'sesiones')
 RUTA_CAPTURAS = os.path.join(RUTA_BASE, 'capturas')
 
 # --- ESTADO ---
-data_ect = deque([np.nan] * MAX_PUNTOS, maxlen=MAX_PUNTOS)
+historial = {clave: deque([np.nan] * MAX_PUNTOS, maxlen=MAX_PUNTOS) for clave in CANALES}
+ultima_lectura = {}          # Último valor recibido de cada canal
+maximos = {}                 # Máximo de sesión por canal
+minimos = {}                 # Mínimo de sesión por canal
+canal_foco = CANAL_FOCO_INICIAL
+
 ultimo_tiempo_dato = 0.0
 conectado = False
-
-# Estadísticas de sesión
 inicio_sesion = None
-ect_max = None
-ect_min = None
-rpm_pico = 0
-batt_min = None
 paquetes_ok = 0
 paquetes_error = 0
-sellos_tiempo = deque(maxlen=FRECUENCIA_HZ * 3)  # Para calcular la frecuencia real
+sellos_tiempo = deque(maxlen=FRECUENCIA_HZ * 3)
 
 # Grabación a CSV
 grabando = False
@@ -91,49 +140,104 @@ texto_pie = ''
 aviso_pie = ''
 aviso_hasta = 0.0
 
-# Configuración del socket UDP
+# Orden de las columnas del CSV de sesión
+COLUMNAS_CSV = ['ect', 'rpm', 'vbatt', 'pcomb', 'taceite', 'paceite', 'map', 'lambda', 'tps', 'marcha']
+
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind((UDP_IP, UDP_PORT))
 sock.setblocking(False)
 
 
-# --- FUNCIONES DE COLOR ---
-def color_ect(temp):
-    if temp >= ECT_CRITICO:
+# --- LÓGICA DE DATOS ---
+def parsear_mensaje(msg):
+    """Convierte el paquete UDP en un diccionario canal -> valor.
+
+    Acepta el formato clave-valor y el posicional antiguo, para que el monitor
+    siga funcionando con el firmware que ya está flasheado en el coche."""
+    if '=' in msg:
+        lectura = {}
+        for par in msg.replace(';', '|').split('|'):
+            clave, sep, valor = par.partition('=')
+            if not sep:
+                continue
+            try:
+                lectura[clave.strip().lower()] = float(valor)
+            except ValueError:
+                continue    # Una clave ilegible no invalida el resto del paquete
+        if not lectura:
+            raise ValueError('paquete clave-valor sin ningún campo legible')
+        return lectura
+
+    partes = msg.split('|')
+    if len(partes) != len(CLAVES_LEGADO):
+        raise ValueError(f'se esperaban {len(CLAVES_LEGADO)} campos, llegaron {len(partes)}')
+    return {clave: float(valor) for clave, valor in zip(CLAVES_LEGADO, partes)}
+
+
+def color_de(clave, valor):
+    """Color semáforo de un valor según las zonas declaradas para su canal."""
+    if valor is None or (isinstance(valor, float) and np.isnan(valor)):
+        return TXT_DIM
+    if clave == 'lambda':
+        return color_lambda(valor, ultima_lectura.get('lambda_obj'))
+    for limite, color in CANALES[clave]['zonas']:
+        if valor < limite:
+            return color
+    return TXT
+
+
+def color_lambda(valor, objetivo):
+    """Mezcla pobre es peligrosa (funde pistones); rica solo desperdicia."""
+    if not objetivo or objetivo <= 0:
+        objetivo = CANALES['lambda']['referencia']
+    desviacion = valor - objetivo
+    if desviacion >= LAMBDA_POBRE_CRITICO:
         return ROJO
-    elif temp >= ECT_PRECAUCION:
+    if desviacion >= LAMBDA_POBRE_AVISO:
         return AMBAR
-    elif temp >= ECT_FRIO:
-        return VERDE
-    else:
-        return CIAN
-
-
-def estado_ect(temp):
-    if temp >= ECT_CRITICO:
-        return 'CRÍTICO'
-    elif temp >= ECT_PRECAUCION:
-        return 'PRECAUCIÓN'
-    elif temp >= ECT_FRIO:
-        return 'NORMAL'
-    else:
-        return 'EN CALENTAMIENTO'
-
-
-def color_batt(voltios):
-    if voltios < BATT_CRITICO or voltios > BATT_SOBRECARGA:
-        return ROJO
-    elif voltios < BATT_BAJO:
+    if desviacion <= LAMBDA_RICA_AVISO:
         return AMBAR
-    else:
-        return VERDE
+    return VERDE
+
+
+def referencia_de(clave):
+    """Valor de referencia del canal. En lambda lo manda la propia ECU."""
+    if clave == 'lambda':
+        return ultima_lectura.get('lambda_obj') or CANALES['lambda']['referencia']
+    return CANALES[clave]['referencia']
+
+
+def formatear(clave, valor):
+    if valor is None or (isinstance(valor, float) and np.isnan(valor)):
+        return '--'
+    decimales = CANALES[clave]['decimales']
+    if decimales == 0:
+        return f'{int(round(valor)):,}'.replace(',', '.')
+    return f'{valor:.{decimales}f}'
+
+
+def valor_csv(clave):
+    """Valor para el fichero de sesión: sin separador de millares, que rompería
+    el CSV, y con los decimales propios del canal (RPM y marcha son enteros)."""
+    valor = ultima_lectura.get(clave)
+    if valor is None:
+        return ''
+    decimales = CANALES[clave]['decimales'] if clave in CANALES else 0
+    return f'{valor:.{decimales}f}'
+
+
+def formatear_marcha(valor):
+    if valor is None:
+        return '-'
+    valor = int(round(valor))
+    return 'N' if valor == VALOR_NEUTRAL else str(valor)
 
 
 def formato_tiempo(segundos):
     if segundos is None:
         return '--:--'
     segundos = int(segundos)
-    return f"{segundos // 60:02d}:{segundos % 60:02d}"
+    return f'{segundos // 60:02d}:{segundos % 60:02d}'
 
 
 def cargar_logo(ruta):
@@ -148,12 +252,12 @@ def cargar_logo(ruta):
         img = img.astype(float).copy()
     if img.ndim != 3 or img.shape[2] < 3:
         return None
-    if img.shape[2] == 3:  # Sin canal alfa: se lo añadimos opaco
+    if img.shape[2] == 3:
         img = np.dstack([img, np.ones(img.shape[:2])])
 
     rgb = img[:, :, :3]
     luminancia = rgb @ np.array([0.299, 0.587, 0.114])
-    oscuro = luminancia < 0.30                                     # Navy corporativo
+    oscuro = luminancia < 0.30
     medio = (luminancia >= 0.30) & (luminancia < 0.58) & (rgb[:, :, 2] > rgb[:, :, 0])
     img[oscuro, :3] = to_rgb(TXT)
     img[medio, :3] = to_rgb(AZUL)
@@ -178,10 +282,29 @@ plt.rcParams['ytick.color'] = TXT_DIM
 fig = plt.figure(figsize=(16, 9))
 fig.canvas.manager.set_window_title('G26 Telemetry - Formula Gades')
 
+
+def preparar_panel(ax, color_acento=None, fondo=PANEL):
+    """Fondo de panel + barra de acento a la izquierda, el mismo lenguaje visual
+    que las tarjetas de la plataforma web."""
+    ax.set_facecolor(fondo)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    if color_acento is None:
+        return None
+    acento = Rectangle((0, 0), 0.011, 1, transform=ax.transAxes,
+                       facecolor=color_acento, zorder=5, clip_on=False)
+    ax.add_patch(acento)
+    return acento
+
+
 # --- CABECERA ---
 logo = cargar_logo(RUTA_LOGO)
 if logo is not None:
-    alto_logo = 0.42 / 9.0                                  # 0,42 pulgadas de alto
+    alto_logo = 0.42 / 9.0
     ancho_logo = (0.42 * (logo.shape[1] / logo.shape[0])) / 16.0
     ax_logo = fig.add_axes([0.035, 0.9315, ancho_logo, alto_logo])
     ax_logo.imshow(logo)
@@ -211,48 +334,32 @@ txt_hz = fig.text(0.830, 0.937, '-- Hz', fontsize=10, color=TXT_DIM, va='center'
 led_rec = crear_led(0.9015, 0.937, APAGADO)
 txt_rec = fig.text(0.911, 0.937, 'SIN GRABAR', fontsize=10, color=TXT_DIM, va='center')
 
+# Banda de alarma: con tantos canales ya no se pueden vigilar todos a la vez,
+# así que la alarma viene a buscarte en lugar de esperar a que mires la casilla
+txt_alarma = fig.text(0.50, 0.952, '', fontsize=12, fontweight='bold', color=TXT,
+                      ha='center', va='center', zorder=10,
+                      bbox=dict(facecolor=ROJO, edgecolor='none', boxstyle='square,pad=0.45'))
+txt_alarma.set_visible(False)
+
 fig.add_artist(Line2D([0.035, 0.975], [0.916, 0.916], color=GRID, lw=1.2,
                       transform=fig.transFigure))
-fig.text(0.035, 0.017, 'R  grabar sesión        S  captura        F  pantalla completa        Q  salir',
-         fontsize=8.5, color=TXT_DIM, va='center')
+
+txt_sesion = fig.text(0.035, 0.017, '', fontsize=8.5, color=TXT_DIM, va='center')
+fig.text(0.50, 0.017, 'R  grabar        S  captura        1-7  gráfica        F  pantalla completa        Q  salir',
+         fontsize=8.5, color=TXT_DIM, ha='center', va='center')
 txt_fichero = fig.text(0.975, 0.017, '', fontsize=8.5, color=TXT_DIM, ha='right', va='center')
 
-# --- REJILLA PRINCIPAL ---
-gs = GridSpec(3, 2, height_ratios=[0.62, 3.1, 1.05], width_ratios=[1, 3.3],
-              left=0.035, right=0.975, top=0.895, bottom=0.048,
-              hspace=0.30, wspace=0.09)
+# --- BANDA A: LO QUE HACE EL PILOTO (RPM + MARCHA + ACELERADOR) ---
+gs_a = GridSpec(1, 3, width_ratios=[3.0, 0.72, 0.85],
+                left=0.035, right=0.975, top=0.893, bottom=0.712, wspace=0.030)
 
-
-def preparar_panel(ax, color_acento=None):
-    """Fondo de panel + barra de acento a la izquierda, el mismo lenguaje visual
-    que las tarjetas de la plataforma web."""
-    ax.set_facecolor(PANEL)
-    for spine in ax.spines.values():
-        spine.set_visible(False)
-    ax.set_xticks([])
-    ax.set_yticks([])
-    ax.set_xlim(0, 1)
-    ax.set_ylim(0, 1)
-    if color_acento is None:
-        return None
-    acento = Rectangle((0, 0), 0.011, 1, transform=ax.transAxes,
-                       facecolor=color_acento, zorder=5, clip_on=False)
-    ax.add_patch(acento)
-    return acento
-
-
-# --- 1. TIRA DE LUCES DE CAMBIO (RPM) ---
-ax_rpm = fig.add_subplot(gs[0, :])
-ax_rpm.set_facecolor(FONDO)
-for spine in ax_rpm.spines.values():
-    spine.set_visible(False)
-ax_rpm.set_xticks([])
-ax_rpm.set_yticks([])
+# A1. Luces de cambio
+ax_rpm = fig.add_subplot(gs_a[0, 0])
+preparar_panel(ax_rpm)
 ax_rpm.set_xlim(0, 100)
-ax_rpm.set_ylim(0, 1)
 
 N_SEGMENTOS = 22
-ANCHO_TIRA = 79.0
+ANCHO_TIRA = 78.0
 paso = ANCHO_TIRA / N_SEGMENTOS
 segmentos = []
 colores_segmento = []
@@ -265,118 +372,208 @@ for i in range(N_SEGMENTOS):
     else:
         color = ROJO
     colores_segmento.append(color)
-    seg = Rectangle((i * paso, 0.30), paso * 0.76, 0.48, facecolor=APAGADO)
+    seg = Rectangle((2 + i * paso, 0.34), paso * 0.76, 0.40, facecolor=APAGADO)
     ax_rpm.add_patch(seg)
     segmentos.append(seg)
 
-ax_rpm.text(0, 0.13, '0', fontsize=7.5, color=TXT_DIM, va='top')
-ax_rpm.text(ANCHO_TIRA * (RPM_CORTE / MAX_RPM), 0.13, f'{RPM_CORTE // 1000}.000',
+ax_rpm.text(2, 0.26, '0', fontsize=7.5, color=TXT_DIM, va='top')
+ax_rpm.text(2 + ANCHO_TIRA * (RPM_CORTE / MAX_RPM), 0.26, f'{RPM_CORTE // 1000}.000',
             fontsize=7.5, color=ROJO, va='top', ha='center')
-ax_rpm.text(ANCHO_TIRA, 0.13, f'{MAX_RPM // 1000}.000', fontsize=7.5, color=TXT_DIM,
+ax_rpm.text(2 + ANCHO_TIRA, 0.26, f'{MAX_RPM // 1000}.000', fontsize=7.5, color=TXT_DIM,
             va='top', ha='right')
-
-ax_rpm.text(100, 0.97, 'RPM', fontsize=9, color=TXT_DIM, ha='right', va='top')
-txt_rpm = ax_rpm.text(100, 0.48, '0', fontsize=28, fontweight='bold', color=TXT_DIM,
+ax_rpm.text(2, 0.88, 'RPM', fontsize=9, color=TXT_DIM, va='center')
+txt_rpm = ax_rpm.text(98, 0.55, '--', fontsize=30, fontweight='bold', color=TXT_DIM,
                       ha='right', va='center')
 
-# --- 2. LECTURA GRANDE DE TEMPERATURA ---
-ax_ect_num = fig.add_subplot(gs[1, 0])
-acento_ect = preparar_panel(ax_ect_num, TXT_DIM)
-ax_ect_num.text(0.5, 0.90, 'ECT', fontsize=13, fontweight='bold', color=TXT_DIM, ha='center', va='center')
-ax_ect_num.text(0.5, 0.835, 'TEMPERATURA REFRIGERANTE', fontsize=7.5, color=TXT_DIM, ha='center', va='center')
-txt_ect = ax_ect_num.text(0.5, 0.55, '--', fontsize=76, fontweight='bold', color=TXT_DIM,
-                          ha='center', va='center')
-ax_ect_num.text(0.5, 0.345, '°C', fontsize=18, color=TXT_DIM, ha='center', va='center')
-txt_ect_estado = ax_ect_num.text(0.5, 0.16, 'SIN SEÑAL', fontsize=11, fontweight='bold',
-                                 color=TXT_DIM, ha='center', va='center')
+# A2. Marcha: el dato más glanceable de un panel, por eso va a tamaño máximo
+ax_marcha = fig.add_subplot(gs_a[0, 1])
+preparar_panel(ax_marcha, AZUL)
+ax_marcha.text(0.5, 0.88, 'MARCHA', fontsize=9, color=TXT_DIM, ha='center', va='center')
+txt_marcha = ax_marcha.text(0.5, 0.42, '-', fontsize=62, fontweight='bold', color=TXT_DIM,
+                            ha='center', va='center')
 
-# --- 3. GRÁFICA DE TEMPERATURA ---
-ax_ect = fig.add_subplot(gs[1, 1])
-ax_ect.set_facecolor(PANEL)
-ax_ect.set_ylim(ECT_MIN_VIS, ECT_MAX_VIS)
-ax_ect.set_xlim(0, MAX_PUNTOS)
+# A3. Acelerador
+ax_tps = fig.add_subplot(gs_a[0, 2])
+preparar_panel(ax_tps, AZUL)
+ax_tps.text(0.09, 0.86, 'TPS', fontsize=9, color=TXT_DIM, va='center')
+txt_tps = ax_tps.text(0.93, 0.84, '--', fontsize=20, fontweight='bold', color=TXT_DIM,
+                      ha='right', va='center')
+X_TPS, ANCHO_TPS, Y_TPS, ALTO_TPS = 0.09, 0.84, 0.30, 0.26
+ax_tps.add_patch(Rectangle((X_TPS, Y_TPS), ANCHO_TPS, ALTO_TPS, facecolor=APAGADO))
+bar_tps = Rectangle((X_TPS, Y_TPS), 0, ALTO_TPS, facecolor=AZUL)
+ax_tps.add_patch(bar_tps)
+for pct in (0, 50, 100):
+    x = X_TPS + ANCHO_TPS * pct / 100
+    ax_tps.text(x, 0.22, f'{pct}', fontsize=7, color=TXT_DIM, ha='center', va='top')
+
+# --- BANDA B: CANAL CON FOCO (número grande + gráfica) ---
+gs_b = GridSpec(1, 2, width_ratios=[1, 3.3],
+                left=0.035, right=0.975, top=0.678, bottom=0.318, wspace=0.09)
+
+ax_foco_num = fig.add_subplot(gs_b[0, 0])
+acento_foco = preparar_panel(ax_foco_num, TXT_DIM)
+txt_foco_etiqueta = ax_foco_num.text(0.5, 0.90, '', fontsize=13, fontweight='bold',
+                                     color=TXT_DIM, ha='center', va='center')
+txt_foco_desc = ax_foco_num.text(0.5, 0.835, '', fontsize=7.5, color=TXT_DIM,
+                                 ha='center', va='center')
+txt_foco_valor = ax_foco_num.text(0.5, 0.55, '--', fontsize=76, fontweight='bold',
+                                  color=TXT_DIM, ha='center', va='center')
+txt_foco_unidad = ax_foco_num.text(0.5, 0.345, '', fontsize=18, color=TXT_DIM,
+                                   ha='center', va='center')
+txt_foco_estado = ax_foco_num.text(0.5, 0.16, 'SIN SEÑAL', fontsize=11, fontweight='bold',
+                                   color=TXT_DIM, ha='center', va='center')
+
+ax_foco = fig.add_subplot(gs_b[0, 1])
+ax_foco.set_facecolor(PANEL)
 for lado in ('top', 'right'):
-    ax_ect.spines[lado].set_visible(False)
+    ax_foco.spines[lado].set_visible(False)
 for lado in ('bottom', 'left'):
-    ax_ect.spines[lado].set_color(GRID)
-
-# Bandas de referencia: se ve de un vistazo en qué zona está el motor
-ax_ect.axhspan(ECT_MIN_VIS, ECT_FRIO, color=CIAN, alpha=0.05, zorder=0)
-ax_ect.axhspan(ECT_FRIO, ECT_PRECAUCION, color=VERDE, alpha=0.07, zorder=0)
-ax_ect.axhspan(ECT_PRECAUCION, ECT_CRITICO, color=AMBAR, alpha=0.11, zorder=0)
-ax_ect.axhspan(ECT_CRITICO, ECT_MAX_VIS, color=ROJO, alpha=0.14, zorder=0)
-ax_ect.axhline(ECT_PRECAUCION, color=AMBAR, lw=1, ls='--', alpha=0.5, zorder=1)
-ax_ect.axhline(ECT_CRITICO, color=ROJO, lw=1, ls='--', alpha=0.6, zorder=1)
-ax_ect.text(MAX_PUNTOS * 0.005, ECT_CRITICO + 1.5, f'LÍMITE {ECT_CRITICO} °C', fontsize=7.5,
-            color=ROJO, ha='left', va='bottom', zorder=5,
-            bbox=dict(facecolor=PANEL, edgecolor='none', boxstyle='square,pad=0.25'))
-
-ax_ect.set_yticks(range(20, 131, 20))  # Sin el 0, que chocaría con la etiqueta del eje X
-ax_ect.set_ylabel('°C', fontsize=10, color=TXT_DIM)
-ax_ect.set_xticks([0, MAX_PUNTOS * 0.25, MAX_PUNTOS * 0.5, MAX_PUNTOS * 0.75, MAX_PUNTOS])
-ax_ect.set_xticklabels([f'-{VENTANA_SEG:g} s'.replace('.', ','),
-                        f'-{VENTANA_SEG * 0.75:g} s'.replace('.', ','),
-                        f'-{VENTANA_SEG * 0.5:g} s'.replace('.', ','),
-                        f'-{VENTANA_SEG * 0.25:g} s'.replace('.', ','), 'ahora'],
-                       fontsize=8)
-ax_ect.grid(True, color=GRID, alpha=0.55, linestyle='--', lw=0.7, zorder=1)
-ax_ect.tick_params(length=0, labelsize=9)
-
-line_ect, = ax_ect.plot([], [], color=TXT, lw=2.2, zorder=3, solid_capstyle='round')
-punto_ect, = ax_ect.plot([], [], marker='o', markersize=7, color=TXT, zorder=4)
-
-# --- 4. BATERÍA ---
-ax_batt = fig.add_subplot(gs[2, 0])
-preparar_panel(ax_batt, NARANJA)
-ax_batt.text(0.09, 0.74, 'BATERÍA', fontsize=10, fontweight='bold', color=TXT_DIM, va='center')
-txt_batt = ax_batt.text(0.93, 0.72, '-- V', fontsize=22, fontweight='bold', color=TXT_DIM,
-                        ha='right', va='center')
-
-X_BARRA, ANCHO_BARRA, Y_BARRA, ALTO_BARRA = 0.09, 0.84, 0.30, 0.22
+    ax_foco.spines[lado].set_color(GRID)
+ax_foco.set_xlim(0, MAX_PUNTOS)
+ax_foco.set_xticks([0, MAX_PUNTOS * 0.25, MAX_PUNTOS * 0.5, MAX_PUNTOS * 0.75, MAX_PUNTOS])
+ax_foco.set_xticklabels([f'-{VENTANA_SEG:g} s'.replace('.', ','),
+                         f'-{VENTANA_SEG * 0.75:g} s'.replace('.', ','),
+                         f'-{VENTANA_SEG * 0.5:g} s'.replace('.', ','),
+                         f'-{VENTANA_SEG * 0.25:g} s'.replace('.', ','), 'ahora'],
+                        fontsize=8)
+ax_foco.grid(True, color=GRID, alpha=0.55, linestyle='--', lw=0.7, zorder=1)
+ax_foco.tick_params(length=0, labelsize=9)
+line_foco, = ax_foco.plot([], [], color=TXT, lw=2.2, zorder=3, solid_capstyle='round')
+punto_foco, = ax_foco.plot([], [], marker='o', markersize=7, color=TXT, zorder=4)
+adornos_foco = []   # Bandas, líneas de umbral y etiquetas: se rehacen al cambiar de canal
 
 
-def x_voltios(v):
-    """Posición horizontal, en coordenadas del panel, de una tensión dada."""
-    fraccion = (v - BATT_MIN_VIS) / (BATT_MAX_VIS - BATT_MIN_VIS)
-    return X_BARRA + ANCHO_BARRA * max(0.0, min(1.0, fraccion))
+def ticks_bonitos(vmin, vmax, objetivo=6):
+    """Escalones redondos para el eje Y del canal que tenga el foco.
+
+    Se descarta el tick del borde inferior porque se solaparía con la etiqueta
+    del eje de tiempos en la esquina."""
+    rango = vmax - vmin
+    if rango <= 0:
+        return []
+    mejor_paso, mejor_error = None, None
+    for exponente in range(-4, 6):
+        for multiplo in (1, 2, 5):
+            paso = multiplo * (10.0 ** exponente)
+            error = abs(rango / paso - objetivo)
+            if mejor_error is None or error < mejor_error:
+                mejor_paso, mejor_error = paso, error
+    primero = np.ceil(vmin / mejor_paso) * mejor_paso
+    ticks = np.arange(primero, vmax + mejor_paso * 0.5, mejor_paso)
+    return [t for t in ticks if t > vmin + rango * 0.001 and t <= vmax]
 
 
-ax_batt.add_patch(Rectangle((X_BARRA, Y_BARRA), ANCHO_BARRA, ALTO_BARRA, facecolor=APAGADO))
-bar_batt = Rectangle((X_BARRA, Y_BARRA), 0, ALTO_BARRA, facecolor=NARANJA)
-ax_batt.add_patch(bar_batt)
+def aplicar_foco(clave):
+    """Reconfigura la gráfica grande para el canal indicado."""
+    global canal_foco, adornos_foco
+    canal_foco = clave
+    cfg = CANALES[clave]
 
-# Marca de la zona de trabajo: con la escala completa el ojo necesita una
-# referencia de dónde debería estar la aguja, no solo el valor absoluto
-y_zona = Y_BARRA + ALTO_BARRA + 0.05
-ax_batt.add_line(Line2D([x_voltios(BATT_CRITICO), x_voltios(BATT_SOBRECARGA)], [y_zona, y_zona],
-                        color=VERDE, lw=2.5, alpha=0.65, solid_capstyle='butt'))
-for v in (BATT_CRITICO, BATT_SOBRECARGA):
-    ax_batt.add_line(Line2D([x_voltios(v)] * 2, [y_zona - 0.035, y_zona + 0.035],
-                            color=VERDE, lw=1.2, alpha=0.65))
-ax_batt.text(x_voltios(BATT_SOBRECARGA) + 0.02, y_zona, 'ZONA ÚTIL', fontsize=6,
-             color=TXT_DIM, va='center', ha='left')
+    for adorno in adornos_foco:
+        adorno.remove()
+    adornos_foco = []
 
-for v in range(0, int(BATT_MAX_VIS) + 1, 4):
-    x = x_voltios(v)
-    ax_batt.add_line(Line2D([x, x], [Y_BARRA - 0.06, Y_BARRA], color=GRID, lw=1))
-    ax_batt.text(x, 0.20, str(v), fontsize=7, color=TXT_DIM, ha='center', va='top')
+    ax_foco.set_ylim(cfg['vmin'], cfg['vmax'])
+    ax_foco.set_yticks(ticks_bonitos(cfg['vmin'], cfg['vmax']))
+    ax_foco.set_ylabel(cfg['unidad'] or cfg['etiqueta'], fontsize=10, color=TXT_DIM)
 
-# --- 5. ESTADÍSTICAS DE SESIÓN ---
-ax_stats = fig.add_subplot(gs[2, 1])
-preparar_panel(ax_stats, AZUL)
-ETIQUETAS_STATS = ['ECT MÁX', 'ECT MÍN', 'RPM PICO', 'BATT MÍN', 'SESIÓN', 'PAQUETES']
-txt_stats = []
-for i, etiqueta in enumerate(ETIQUETAS_STATS):
-    cx = (i + 0.5) / len(ETIQUETAS_STATS)
-    ax_stats.text(cx, 0.70, etiqueta, fontsize=8.5, color=TXT_DIM, ha='center', va='center')
-    txt_stats.append(ax_stats.text(cx, 0.36, '--', fontsize=19, fontweight='bold',
-                                   color=TXT, ha='center', va='center'))
-    if i:
-        x_sep = i / len(ETIQUETAS_STATS)
-        ax_stats.add_line(Line2D([x_sep, x_sep], [0.22, 0.80], color=GRID, lw=1))
+    # Bandas de zona: se ve de un vistazo en qué régimen está el canal
+    inferior = cfg['vmin']
+    for limite, color in cfg['zonas']:
+        superior = min(limite, cfg['vmax'])
+        if superior <= inferior:
+            continue
+        alpha = 0.05 if color in (AZUL, CIAN) else (0.14 if color == ROJO else 0.08)
+        adornos_foco.append(ax_foco.axhspan(inferior, superior, color=color, alpha=alpha, zorder=0))
+        if color in (AMBAR, ROJO) and inferior > cfg['vmin']:
+            adornos_foco.append(ax_foco.axhline(inferior, color=color, lw=1, ls='--',
+                                                alpha=0.55, zorder=1))
+            adornos_foco.append(ax_foco.text(
+                MAX_PUNTOS * 0.005, inferior + (cfg['vmax'] - cfg['vmin']) * 0.012,
+                f'{inferior:g} {cfg["unidad"]}'.strip(), fontsize=7.5, color=color,
+                ha='left', va='bottom', zorder=5,
+                bbox=dict(facecolor=PANEL, edgecolor='none', boxstyle='square,pad=0.25')))
+        inferior = superior
+
+    referencia = referencia_de(clave)
+    if referencia is not None:
+        adornos_foco.append(ax_foco.axhline(referencia, color=TXT_DIM, lw=1, ls=':',
+                                            alpha=0.7, zorder=2))
+
+    txt_foco_etiqueta.set_text(cfg['etiqueta'])
+    txt_foco_desc.set_text(cfg['descripcion'])
+    txt_foco_unidad.set_text(cfg['unidad'])
+    for tarjeta in TARJETAS:
+        tarjetas[tarjeta]['marco'].set_visible(tarjeta == clave)
 
 
-# --- GRABACIÓN A CSV ---
+# --- BANDA C: TARJETAS DE VIGILANCIA ---
+gs_c = GridSpec(1, len(TARJETAS), left=0.035, right=0.975, top=0.282, bottom=0.052,
+                wspace=0.030)
+
+tarjetas = {}
+for indice, clave in enumerate(TARJETAS):
+    cfg = CANALES[clave]
+    ax = fig.add_subplot(gs_c[0, indice])
+    acento = preparar_panel(ax, TXT_DIM)
+
+    # Marco que señala qué tarjeta está en la gráfica grande
+    marco = Rectangle((0.004, 0.01), 0.992, 0.98, transform=ax.transAxes, fill=False,
+                      edgecolor=AZUL, lw=1.6, zorder=6)
+    marco.set_visible(False)
+    ax.add_patch(marco)
+
+    ax.text(0.09, 0.86, cfg['etiqueta'], fontsize=10, fontweight='bold', color=TXT_DIM, va='center')
+    ax.text(0.955, 0.86, str(indice + 1), fontsize=8, color=TXT_DIM, ha='right', va='center')
+    txt_valor = ax.text(0.09, 0.60, '--', fontsize=26, fontweight='bold', color=TXT_DIM, va='center')
+    txt_unidad = ax.text(0.955, 0.55, cfg['unidad'], fontsize=10, color=TXT_DIM,
+                         ha='right', va='center')
+    txt_extremos = ax.text(0.09, 0.36, '', fontsize=7, color=TXT_DIM, va='center')
+
+    # Sparkline: cada canal lleva su propia historia, no solo el que tiene el foco.
+    # Se normaliza contra el rango fijo del canal, nunca autoescalado: si no, una
+    # señal plana con ruido de milésimas parecería una montaña rusa.
+    X0_SPARK, X1_SPARK, Y0_SPARK, Y1_SPARK = 0.09, 0.955, 0.10, 0.30
+    linea_spark, = ax.plot([], [], color=TXT_DIM, lw=1.3, zorder=3, solid_capstyle='round')
+    linea_ref = Line2D([X0_SPARK, X1_SPARK], [0, 0], color=TXT_DIM, lw=0.8, ls=':',
+                       alpha=0.6, zorder=2)
+    ax.add_line(linea_ref)
+    linea_ref.set_visible(cfg['referencia'] is not None)
+
+    tarjetas[clave] = dict(ax=ax, acento=acento, marco=marco, valor=txt_valor,
+                           unidad=txt_unidad, extremos=txt_extremos, spark=linea_spark,
+                           ref=linea_ref,
+                           caja=(X0_SPARK, X1_SPARK, Y0_SPARK, Y1_SPARK))
+
+aplicar_foco(CANAL_FOCO_INICIAL)
+
+
+def puntos_sparkline(clave, caja):
+    """Proyecta la historia del canal dentro del recuadro de su tarjeta."""
+    x0, x1, y0, y1 = caja
+    cfg = CANALES[clave]
+    datos = np.array(historial[clave], dtype=float)
+    recorrido = cfg['vmax'] - cfg['vmin']
+    if recorrido <= 0:
+        return [], []
+    normalizado = (datos - cfg['vmin']) / recorrido
+    normalizado = np.clip(normalizado, 0.0, 1.0)
+    xs = np.linspace(x0, x1, len(datos))
+    return xs, y0 + normalizado * (y1 - y0)
+
+
+def y_sparkline(clave, valor, caja):
+    """Altura, dentro de la tarjeta, que corresponde a un valor del canal."""
+    _, _, y0, y1 = caja
+    cfg = CANALES[clave]
+    recorrido = cfg['vmax'] - cfg['vmin']
+    if recorrido <= 0:
+        return y0
+    fraccion = min(max((valor - cfg['vmin']) / recorrido, 0.0), 1.0)
+    return y0 + fraccion * (y1 - y0)
+
+
+# --- GRABACIÓN Y CAPTURA ---
 def alternar_grabacion():
     """Arranca o detiene el volcado de la sesión a CSV. El fichero resultante es
     el que se sube después a la plataforma web como registro de telemetría."""
@@ -402,7 +599,7 @@ def alternar_grabacion():
     nombre_grabacion = f"sesion_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
     fichero_csv = open(os.path.join(RUTA_SESIONES, nombre_grabacion), 'w', newline='', encoding='utf-8')
     escritor_csv = csv.writer(fichero_csv)
-    escritor_csv.writerow(['n_muestra', 'tiempo_s', 'hora', 'ect_c', 'rpm', 'vbatt_v'])
+    escritor_csv.writerow(['n_muestra', 'tiempo_s', 'hora'] + COLUMNAS_CSV)
     inicio_grabacion = time.time()
     muestras_grabadas = 0
     grabando = True
@@ -430,6 +627,11 @@ def al_pulsar_tecla(event):
         alternar_grabacion()
     elif event.key == 's':
         capturar_pantalla()
+    elif event.key and event.key.isdigit():
+        indice = int(event.key) - 1
+        if 0 <= indice < len(TARJETAS):
+            aplicar_foco(TARJETAS[indice])
+            mostrar_aviso(f'Gráfica: {CANALES[TARJETAS[indice]]["descripcion"]}', 2.5)
 
 
 fig.canvas.mpl_connect('key_press_event', al_pulsar_tecla)
@@ -437,27 +639,19 @@ fig.canvas.mpl_connect('key_press_event', al_pulsar_tecla)
 
 def update(frame):
     global ultimo_tiempo_dato, conectado, inicio_sesion
-    global ect_max, ect_min, rpm_pico, batt_min, paquetes_ok, paquetes_error
-    global muestras_grabadas
+    global paquetes_ok, paquetes_error, muestras_grabadas
 
     txt_reloj.set_text(datetime.now().strftime('%H:%M:%S'))
     ahora = time.time()
-
-    val_ect = val_rpm = val_batt = None
+    hubo_dato = False
 
     # --- LECTURA DEL SOCKET (vaciamos todo lo pendiente) ---
     try:
         while True:
-            data, addr = sock.recvfrom(1024)
-            partes = data.decode('utf-8').split('|')
-            if len(partes) != 3:
-                paquetes_error += 1
-                continue
+            data, _ = sock.recvfrom(1024)
             try:
-                val_ect = float(partes[0])
-                val_rpm = float(partes[1])
-                val_batt = float(partes[2])
-            except ValueError:
+                lectura = parsear_mensaje(data.decode('utf-8'))
+            except (ValueError, UnicodeDecodeError):
                 paquetes_error += 1
                 continue
 
@@ -466,29 +660,27 @@ def update(frame):
             t_paquete = time.time()
             ultimo_tiempo_dato = t_paquete
             paquetes_ok += 1
+            hubo_dato = True
             sellos_tiempo.append(t_paquete)
             if inicio_sesion is None:
                 inicio_sesion = t_paquete
 
-            data_ect.append(val_ect)
-
-            # Estadísticas de sesión
-            ect_max = val_ect if ect_max is None else max(ect_max, val_ect)
-            ect_min = val_ect if ect_min is None else min(ect_min, val_ect)
-            rpm_pico = max(rpm_pico, val_rpm)
-            batt_min = val_batt if batt_min is None else min(batt_min, val_batt)
+            ultima_lectura.update(lectura)
+            for clave, valor in lectura.items():
+                if clave in historial:
+                    historial[clave].append(valor)
+                    maximos[clave] = valor if clave not in maximos else max(maximos[clave], valor)
+                    minimos[clave] = valor if clave not in minimos else min(minimos[clave], valor)
 
             if grabando:
                 muestras_grabadas += 1
-                escritor_csv.writerow([muestras_grabadas,
-                                       f'{t_paquete - inicio_grabacion:.3f}',
-                                       datetime.now().strftime('%H:%M:%S.%f')[:-3],
-                                       f'{val_ect:.1f}', int(val_rpm), f'{val_batt:.2f}'])
+                escritor_csv.writerow(
+                    [muestras_grabadas, f'{t_paquete - inicio_grabacion:.3f}',
+                     datetime.now().strftime('%H:%M:%S.%f')[:-3]]
+                    + [valor_csv(col) for col in COLUMNAS_CSV])
                 fichero_csv.flush()
     except BlockingIOError:
         pass
-    except UnicodeDecodeError:
-        paquetes_error += 1
 
     conectado = (ahora - ultimo_tiempo_dato) <= TIMEOUT_SEG
 
@@ -501,40 +693,23 @@ def update(frame):
         txt_hz.set_text(f'{hz} Hz')
         txt_hz.set_color(TXT_DIM if hz >= FRECUENCIA_HZ * 0.7 else AMBAR)
     else:
-        data_ect.append(np.nan)  # Corta la línea en vez de dibujar un cero falso
+        if not hubo_dato:
+            # Cortamos las líneas en vez de dibujar ceros falsos
+            for cola in historial.values():
+                cola.append(np.nan)
+            ultima_lectura.clear()
         txt_estado.set_text('SIN SEÑAL')
         txt_estado.set_color(ROJO)
         led_estado.set_color(ROJO)
         txt_hz.set_text('-- Hz')
         txt_hz.set_color(TXT_DIM)
 
-    # --- TEMPERATURA ---
-    if conectado and val_ect is not None:
-        color = color_ect(val_ect)
-        txt_ect.set_text(f'{val_ect:.1f}')
-        txt_ect.set_color(color)
-        txt_ect_estado.set_text(estado_ect(val_ect))
-        txt_ect_estado.set_color(color)
-        acento_ect.set_facecolor(color)
-        line_ect.set_color(color)
-        punto_ect.set_color(color)
-        punto_ect.set_data([MAX_PUNTOS - 1], [val_ect])
-    elif not conectado:
-        txt_ect.set_text('--')
-        txt_ect.set_color(TXT_DIM)
-        txt_ect_estado.set_text('SIN SEÑAL')
-        txt_ect_estado.set_color(TXT_DIM)
-        acento_ect.set_facecolor(TXT_DIM)
-        line_ect.set_color(TXT_DIM)
-        punto_ect.set_data([], [])
-
-    line_ect.set_data(range(MAX_PUNTOS), data_ect)
-
-    # --- RPM: luces de cambio ---
-    if conectado and val_rpm is not None:
-        val_rpm = max(0, min(MAX_RPM, val_rpm))
-        encendidos = int(round((val_rpm / MAX_RPM) * N_SEGMENTOS))
-        en_corte = val_rpm >= RPM_CORTE
+    # --- BANDA A: RPM, MARCHA, TPS ---
+    valor_rpm = ultima_lectura.get('rpm') if conectado else None
+    if valor_rpm is not None:
+        valor_rpm = max(0, min(MAX_RPM, valor_rpm))
+        encendidos = int(round((valor_rpm / MAX_RPM) * N_SEGMENTOS))
+        en_corte = valor_rpm >= RPM_CORTE
         destello = en_corte and (frame // 4) % 2 == 0
         for i, seg in enumerate(segmentos):
             if destello:
@@ -543,38 +718,102 @@ def update(frame):
                 seg.set_facecolor(colores_segmento[i])
             else:
                 seg.set_facecolor(APAGADO)
-        txt_rpm.set_text(f'{int(val_rpm):,}'.replace(',', '.'))
+        txt_rpm.set_text(formatear('rpm', valor_rpm))
         txt_rpm.set_color(ROJO if en_corte else TXT)
-    elif not conectado:
+    else:
         for seg in segmentos:
             seg.set_facecolor(APAGADO)
         txt_rpm.set_text('--')
         txt_rpm.set_color(TXT_DIM)
 
-    # --- BATERÍA ---
-    if conectado and val_batt is not None:
-        fraccion = (val_batt - BATT_MIN_VIS) / (BATT_MAX_VIS - BATT_MIN_VIS)
-        bar_batt.set_width(ANCHO_BARRA * max(0.0, min(1.0, fraccion)))
-        bar_batt.set_facecolor(color_batt(val_batt))
-        txt_batt.set_text(f'{val_batt:.1f} V')
-        txt_batt.set_color(color_batt(val_batt))
-    elif not conectado:
-        bar_batt.set_width(0)
-        txt_batt.set_text('-- V')
-        txt_batt.set_color(TXT_DIM)
+    valor_marcha = ultima_lectura.get('marcha') if conectado else None
+    txt_marcha.set_text(formatear_marcha(valor_marcha))
+    if valor_marcha is None:
+        txt_marcha.set_color(TXT_DIM)
+    elif int(round(valor_marcha)) == VALOR_NEUTRAL:
+        txt_marcha.set_color(VERDE)
+    else:
+        txt_marcha.set_color(TXT)
 
-    # --- ESTADÍSTICAS ---
-    txt_stats[0].set_text('--' if ect_max is None else f'{ect_max:.1f}')
-    txt_stats[1].set_text('--' if ect_min is None else f'{ect_min:.1f}')
-    txt_stats[2].set_text(f'{int(rpm_pico):,}'.replace(',', '.') if rpm_pico else '--')
-    txt_stats[3].set_text('--' if batt_min is None else f'{batt_min:.1f}')
-    txt_stats[4].set_text(formato_tiempo(None if inicio_sesion is None else ahora - inicio_sesion))
-    txt_stats[5].set_text(f'{paquetes_ok:,}'.replace(',', '.'))
-    txt_stats[0].set_color(TXT if ect_max is None else color_ect(ect_max))
-    txt_stats[3].set_color(TXT if batt_min is None else color_batt(batt_min))
-    txt_stats[5].set_color(AMBAR if paquetes_error else TXT)
+    valor_tps = ultima_lectura.get('tps') if conectado else None
+    if valor_tps is not None:
+        fraccion = min(max(valor_tps / 100.0, 0.0), 1.0)
+        bar_tps.set_width(ANCHO_TPS * fraccion)
+        txt_tps.set_text(f'{formatear("tps", valor_tps)} %')
+        txt_tps.set_color(TXT)
+    else:
+        bar_tps.set_width(0)
+        txt_tps.set_text('--')
+        txt_tps.set_color(TXT_DIM)
 
-    # --- INDICADOR DE GRABACIÓN ---
+    # --- BANDA C: TARJETAS ---
+    alarmas = []
+    for clave, widgets in tarjetas.items():
+        valor = ultima_lectura.get(clave) if conectado else None
+        color = color_de(clave, valor)
+        widgets['valor'].set_text(formatear(clave, valor))
+        widgets['valor'].set_color(color)
+        widgets['unidad'].set_color(TXT_DIM)
+        widgets['acento'].set_facecolor(color)
+        widgets['spark'].set_color(color if valor is not None else TXT_DIM)
+
+        xs, ys = puntos_sparkline(clave, widgets['caja'])
+        widgets['spark'].set_data(xs, ys)
+
+        referencia = referencia_de(clave)
+        if referencia is not None:
+            y_ref = y_sparkline(clave, referencia, widgets['caja'])
+            widgets['ref'].set_ydata([y_ref, y_ref])
+            widgets['ref'].set_visible(True)
+        else:
+            widgets['ref'].set_visible(False)
+
+        if clave in maximos:
+            widgets['extremos'].set_text(
+                f'máx {formatear(clave, maximos[clave])}   mín {formatear(clave, minimos[clave])}')
+        else:
+            widgets['extremos'].set_text('')
+
+        if color == ROJO and valor is not None:
+            alarmas.append(CANALES[clave]['etiqueta'])
+
+    # --- BANDA B: CANAL CON FOCO ---
+    valor_foco = ultima_lectura.get(canal_foco) if conectado else None
+    color_foco = color_de(canal_foco, valor_foco)
+    txt_foco_valor.set_text(formatear(canal_foco, valor_foco))
+    txt_foco_valor.set_color(color_foco)
+    acento_foco.set_facecolor(color_foco)
+    line_foco.set_color(color_foco if valor_foco is not None else TXT_DIM)
+    line_foco.set_data(range(MAX_PUNTOS), historial[canal_foco])
+
+    if valor_foco is None:
+        txt_foco_estado.set_text('SIN SEÑAL' if not conectado else 'SIN DATO')
+        txt_foco_estado.set_color(TXT_DIM)
+        punto_foco.set_data([], [])
+    else:
+        if color_foco == ROJO:
+            estado = 'CRÍTICO'
+        elif color_foco == AMBAR:
+            estado = 'PRECAUCIÓN'
+        elif color_foco == CIAN:
+            estado = 'EN CALENTAMIENTO'
+        else:
+            estado = 'NORMAL'
+        txt_foco_estado.set_text(estado)
+        txt_foco_estado.set_color(color_foco)
+        punto_foco.set_color(color_foco)
+        punto_foco.set_data([MAX_PUNTOS - 1], [valor_foco])
+
+    # --- ALARMA ---
+    if alarmas:
+        txt_alarma.set_text('  ALARMA:  ' + '   ·   '.join(alarmas) + '  ')
+        txt_alarma.set_visible(True)
+        encendida = (frame // 5) % 2 == 0
+        txt_alarma.get_bbox_patch().set_facecolor(ROJO if encendida else '#6E1414')
+    else:
+        txt_alarma.set_visible(False)
+
+    # --- INDICADOR DE GRABACIÓN Y PIE ---
     if grabando:
         parpadeo = (frame // 6) % 2 == 0
         txt_rec.set_text(f'REC {formato_tiempo(ahora - inicio_grabacion)}')
@@ -585,7 +824,10 @@ def update(frame):
         txt_rec.set_color(TXT_DIM)
         led_rec.set_color(APAGADO)
 
-    # --- PIE: el aviso temporal tiene prioridad sobre el estado fijo ---
+    sesion = formato_tiempo(None if inicio_sesion is None else ahora - inicio_sesion)
+    errores = f'   ·   {paquetes_error} con error' if paquetes_error else ''
+    txt_sesion.set_text(f'SESIÓN {sesion}   ·   {paquetes_ok:,}'.replace(',', '.')
+                        + f' paquetes{errores}')
     txt_fichero.set_text(aviso_pie if ahora < aviso_hasta else texto_pie)
 
     return ()
