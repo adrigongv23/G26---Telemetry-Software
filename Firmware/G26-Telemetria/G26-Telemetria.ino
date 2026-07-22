@@ -6,29 +6,43 @@ DataProcessor dataProcessor;
 CAN canController;
 
 // Objeto UDP para manejar la conexión UDP
-WiFiUDP udp; 
+WiFiUDP udp;
 
 //Envio de datos a través de UDP
 void TaskUdpSender(void *pvParameters){
 
-  Serial.println("Iniciando tarea de envío..."); 
+  Serial.println("Iniciando tarea de envío...");
 
   while (true){
     if(WiFi.status() == WL_CONNECTED){
 
-      //Obtenemos el dato actual
-      int tempActual = dataProcessor.current_ect_value; 
+      //Obtenemos los datos actuales
+      int tempActual = dataProcessor.current_ect_value;
       int rpmActual = dataProcessor.current_rpm_value;
       float battActual = dataProcessor.current_vbatt_value;
 
-      //Pasamos el dato actual a mensaje para enviarlo 
-      String mensaje = String(tempActual) + "|" + String(rpmActual) + "|" + String(battActual, 1);
+      float tpsActual = dataProcessor.current_tps_value;
+      int marchaActual = dataProcessor.current_marcha_value;
+      float pcombActual = dataProcessor.current_pcomb_value;
+      float taceiteActual = dataProcessor.current_taceite_value;
+      float paceiteActual = dataProcessor.current_paceite_value;
+      float mapActual = dataProcessor.current_map_value;
+      float lambdaActual = dataProcessor.current_lambda_value;
+      float lambdaObjActual = dataProcessor.current_lambda_obj_value;
+
+      //Formato "clave=valor" separado por ';'
+      char mensaje[256];
+      snprintf(mensaje, sizeof(mensaje),
+               "ect=%d;rpm=%d;vbatt=%.2f;tps=%.1f;marcha=%d;"
+               "pcomb=%.2f;taceite=%.1f;paceite=%.2f;map=%.1f;lambda=%.3f;lambda_obj=%.3f",
+               tempActual, rpmActual, battActual, tpsActual, marchaActual,
+               pcombActual, taceiteActual, paceiteActual, mapActual, lambdaActual, lambdaObjActual);
 
       //Enviamos el paquete por broadcast a toda la red local (no hace falta conocer la IP del portátil)
       udp.beginPacket(IPAddress(255,255,255,255), UDP_PORT);
       udp.print(mensaje);
       udp.endPacket();
-      
+
       //Para comprobar que el paquete se está enviado correctamente podemos usar estos prints
       //Serial.print("UDP Enviado: ");
       //Serial.println(mensaje);

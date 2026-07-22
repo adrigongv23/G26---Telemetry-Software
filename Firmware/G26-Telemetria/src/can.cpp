@@ -6,6 +6,12 @@
 
 #include "../include/can.hpp"
 
+// Volcado en crudo de TODOS los mensajes del bus, a la velocidad a la que
+// llegan. Satura los 115200 baudios y frena la tarea de escucha, asi que solo
+// debe activarse para depurar el bus. Con esto a 1 no se leen las lineas
+// [TRAMA n] del data_processor, que son las utiles para localizar canales
+#define VOLCADO_CRUDO_CAN 0
+
 static bool driver_installed = false;
 
 void CAN::start() {
@@ -174,36 +180,44 @@ void CAN::listen() {
                 }
                 
                 if (all_zeros) {
+#if VOLCADO_CRUDO_CAN
                     Serial.println("Ignoring message with all zero data");
+#endif
                     taskYIELD();
                     continue;
                 }
-                
+
+#if VOLCADO_CRUDO_CAN
                 if (message.extd) {
                     Serial.println("Extended Format");
                 } else {
                     Serial.println("Standard Format");
                 }
                 Serial.printf("ID: %lx\nByte:", message.identifier);
+                for (int i = 0; i < message.data_length_code && !(message.rtr); i++) {
+                    Serial.printf(" %d = %02x,", i, message.data[i]);
+                }
+                Serial.println("");
+#endif
                 if (!(message.rtr)) {
-                    for (int i = 0; i < message.data_length_code; i++) {
-                        Serial.printf(" %d = %02x,", i, message.data[i]);
-                    }
-                    Serial.println("");
-                    
+
                     // Send to data processor based on first byte (maintaining original logic)
                     switch (message.data[0]) {
                         case 0:
                             _data_processor->send_serial_frame_0(message.data[1], message.data[2], message.data[3], message.data[4], message.data[5], message.data[6], message.data[7]);
                             break;
                         case 1:
-                            //_data_processor->send_serial_frame_1(message.data[1], message.data[2], message.data[3], message.data[4], message.data[5], message.data[6], message.data[7]);
+                            _data_processor->send_serial_frame_1(message.data[1], message.data[2], message.data[3], message.data[4], message.data[5], message.data[6], message.data[7]);
                             break;
                         case 2:
-                             //_data_processor->send_serial_frame_2(message.data[1], message.data[2], message.data[3], message.data[4], message.data[5], message.data[6], message.data[7]);
-                             break;
-                        case 3: 
-                            //_data_processor->send_serial_frame_3(message.data[1], message.data[2], message.data[3], message.data[4], message.data[5], message.data[6], message.data[7]);
+                            _data_processor->send_serial_frame_2(message.data[1], message.data[2], message.data[3], message.data[4], message.data[5], message.data[6], message.data[7]);
+                            break;
+                        case 3:
+                            _data_processor->send_serial_frame_3(message.data[1], message.data[2], message.data[3], message.data[4], message.data[5], message.data[6], message.data[7]);
+                            break;
+                        case 4:
+                            _data_processor->send_serial_frame_4(message.data[1], message.data[2], message.data[3], message.data[4], message.data[5], message.data[6], message.data[7]);
+                            break;
                         default:
                             break;
                     }

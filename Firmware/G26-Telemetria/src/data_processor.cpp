@@ -1,5 +1,6 @@
 #include "../include/data_processor.hpp"
 
+
 char* DataProcessor::process(std::vector<float> data) {
     // Implementación del procesamiento de datos si es necesario
     return nullptr; // Placeholder
@@ -14,29 +15,37 @@ void DataProcessor::send_serial(byte type, unsigned int value) {                
     Serial.write(dato, 8);                                              //Se envía serialmente el mensaje, indicando su longituden bytes para ello.
 }
 
+/*
+    
+    this->current_marcha_value
+    this->current_pcomb_value
+    this->current_taceite_value
+    this->current_paceite_value
+    this->current_map_value
+    this->current_lambda_value
+    this->current_lambda_obj_value
+*/
+
+
 //RPM + TPS + vBatt + ECT
 void DataProcessor::send_serial_frame_0(int rpmh, int rpml, int tpsh, int tpsl, int vbatth, int vbattl, int ect){
 
     //Calculos necesarios para obtener bien el formato de los valores necesarios
     int rpm = (rpmh * 256) + rpml;
     double vbatt = ((vbatth * 256) + vbattl) / 100.0;
-
-    Serial.println("send_serial_frame_0");
+    int tps = (tpsh * 256) + tpsl; 
 
     // Actualizamos las variables globales para que puedan ser leidas por el protocolo UDP
-    this->current_ect_value = ect; 
+    this->current_ect_value = ect;
     this->current_rpm_value = rpm;
     this->current_vbatt_value = vbatt;
-
-    Serial.printf("CAN RX -> ECT: %d | RPM: %d | BATT: %.1f \n", ect, rpm, vbatt);;
+    this->current_tps_value = tps;
 }
 
 
-//LAMB + LAMBTRG + FUEL + GEAR
 void DataProcessor::send_serial_frame_1(int lmbh, int lmbl, int lmbth, int lmbtl, int fuelh, int fuell, int gear){
 
 }
-
 
 void DataProcessor::send_serial_frame_2(int shut, int fan, int lmbch, int lmbcl, int brakeh, int brakel, int aux1){
 
@@ -44,10 +53,9 @@ void DataProcessor::send_serial_frame_2(int shut, int fan, int lmbch, int lmbcl,
 
 void DataProcessor::send_serial_frame_3(int aux3, int aux4, int aux5, int aux6, int aux7, int aux8, int dig1){
 
+
 }
 
 void DataProcessor::send_serial_frame_4(int dig3, int dig4, int dig5, int dig6, int dig7, int dig8, int dig9){
-   
+
 }
-
-
