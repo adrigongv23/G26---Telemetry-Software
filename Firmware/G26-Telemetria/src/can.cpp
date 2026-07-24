@@ -73,16 +73,6 @@ void CAN::start_listening_task() {
             &_listen_task_handle  // Task handle
         );
         
-        // BaseType_t result = xTaskCreatePinnedToCore(
-        //     listenTask,           // Task function
-        //     "CAN_Listen_Task",    // Task name
-        //     4096,                 // Stack size (words)
-        //     this,                 // Task parameter (this CAN instance)
-        //     1,                    // Priority
-        //     &_listen_task_handle, // Task handle
-        //     0                     // Core 0 (main loop typically runs on Core 1)
-        // );
-        
         if (result == pdPASS) {
             Serial.println("CAN listening task created successfully");
         } else {
@@ -148,7 +138,7 @@ void CAN::listen() {
 
         // Check if alert happened
         uint32_t alerts_triggered;
-        twai_read_alerts(&alerts_triggered, pdMS_TO_TICKS(1000)); // Reduced timeout for more responsiveness
+        twai_read_alerts(&alerts_triggered, 0); // Reduced timeout for more responsiveness
         twai_status_info_t twaistatus;
         twai_get_status_info(&twaistatus);
 
@@ -172,7 +162,7 @@ void CAN::listen() {
             int message_count = 0;
             while (twai_receive(&message, 0) == ESP_OK && !_should_stop_listening) {
                 bool all_zeros = true;
-                for (int i = 0; i < message.data_length_code; i++) {
+                for (int i = 1; i < message.data_length_code; i++) {
                     if (message.data[i] != 0) {
                         all_zeros = false;
                         break;
