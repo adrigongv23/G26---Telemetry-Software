@@ -4,7 +4,7 @@ import csv
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from matplotlib.gridspec import GridSpec
-from matplotlib.patches import Rectangle
+from matplotlib.patches import Rectangle, Polygon
 from matplotlib.lines import Line2D
 from matplotlib.colors import to_rgb
 from collections import deque
@@ -28,8 +28,8 @@ MAX_PUNTOS = FRECUENCIA_HZ * VENTANA_SEG
 #   1. "87.3|9200|14.2"   ->   ECT | RPM | BATERÍA
 #
 #   2. Nuevo (clave-valor, para cuando el firmware envíe el resto de canales):
-#        "ect=87.3;rpm=9200;vbatt=14.2;pcomb=3.6;taceite=104;paceite=4.2;
-#         map=98;lambda=0.88;lambda_obj=0.88;tps=45;marcha=3"
+#        "ect=87.3;rpm=9200;vbatt=14.2;velocidad=64;tps=45;freno_del=8.5;
+#         pcomb=3.6;taceite=104;paceite=4.2;map=98;lambda=0.88;lambda_obj=0.88"
 CLAVES_LEGADO = ('ect', 'rpm', 'vbatt')
 
 # --- PALETA (tomada del logo oficial del equipo) ---
@@ -49,8 +49,12 @@ APAGADO = '#18213A'    # Segmento / relleno inactivo
 MAX_RPM = 13000      # Fondo de escala del indicador
 RPM_CORTE = 12000    # Zona roja / corte de inyección
 
-# --- MARCHAS ---
-VALOR_NEUTRAL = 0    # Valor con el que la ECU codifica el punto muerto
+# --- PEDALES ---
+VENTANA_PEDALES_SEG = 7                      # Segundos visibles en la traza de pedales
+PUNTOS_PEDALES = FRECUENCIA_HZ * VENTANA_PEDALES_SEG
+# El sensor de freno es de PRESIÓN (bar). Este es el valor que se dibuja como el
+# 100 % de la traza. AJUSTAR cuando se mida en pista la frenada más fuerte.
+FRENO_PRESION_MAX = 50.0
 
 # --- DEFINICIÓN DE CANALES ---
 # Cada canal declara su rango visible, sus zonas de color y una referencia
@@ -90,6 +94,21 @@ CANALES = {
     'tps': dict(
         etiqueta='TPS', descripcion='ACELERADOR', unidad='%',
         vmin=0, vmax=100, decimales=0, referencia=None,
+        zonas=[(float('inf'), AZUL)]),
+    # Frenos: sensores de PRESIÓN. Se guardan en bar (real) y en la traza se
+    # normalizan a 0-100 % contra FRENO_PRESION_MAX. Solo el delantero está
+    # instalado; el trasero queda declarado a la espera de montarse.
+    'freno_del': dict(
+        etiqueta='FRENO DEL.', descripcion='PRESIÓN FRENO DELANTERO', unidad='bar',
+        vmin=0, vmax=FRENO_PRESION_MAX, decimales=1, referencia=None,
+        zonas=[(float('inf'), ROJO)]),
+    'freno_tra': dict(
+        etiqueta='FRENO TRA.', descripcion='PRESIÓN FRENO TRASERO', unidad='bar',
+        vmin=0, vmax=FRENO_PRESION_MAX, decimales=1, referencia=None,
+        zonas=[(float('inf'), ROJO)]),
+    'velocidad': dict(
+        etiqueta='VELOCIDAD', descripcion='VELOCIDAD', unidad='km/h',
+        vmin=0, vmax=160, decimales=0, referencia=None,
         zonas=[(float('inf'), AZUL)]),
     'rpm': dict(
         etiqueta='RPM', descripcion='RÉGIMEN DE MOTOR', unidad='',
@@ -141,7 +160,8 @@ aviso_pie = ''
 aviso_hasta = 0.0
 
 # Orden de las columnas del CSV de sesión
-COLUMNAS_CSV = ['ect', 'rpm', 'vbatt', 'pcomb', 'taceite', 'paceite', 'map', 'lambda', 'tps', 'marcha']
+COLUMNAS_CSV = ['ect', 'rpm', 'velocidad', 'vbatt', 'tps', 'freno_del', 'freno_tra',
+                'pcomb', 'taceite', 'paceite', 'map', 'lambda']
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind((UDP_IP, UDP_PORT))
@@ -218,19 +238,12 @@ def formatear(clave, valor):
 
 def valor_csv(clave):
     """Valor para el fichero de sesión: sin separador de millares, que rompería
-    el CSV, y con los decimales propios del canal (RPM y marcha son enteros)."""
+    el CSV, y con los decimales propios del canal (RPM y velocidad son enteros)."""
     valor = ultima_lectura.get(clave)
     if valor is None:
         return ''
     decimales = CANALES[clave]['decimales'] if clave in CANALES else 0
     return f'{valor:.{decimales}f}'
-
-
-def formatear_marcha(valor):
-    if valor is None:
-        return '-'
-    valor = int(round(valor))
-    return 'N' if valor == VALOR_NEUTRAL else str(valor)
 
 
 def formato_tiempo(segundos):
@@ -349,8 +362,8 @@ fig.text(0.50, 0.017, 'R  grabar        S  captura        1-7  gráfica        F
          fontsize=8.5, color=TXT_DIM, ha='center', va='center')
 txt_fichero = fig.text(0.975, 0.017, '', fontsize=8.5, color=TXT_DIM, ha='right', va='center')
 
-# --- BANDA A: LO QUE HACE EL PILOTO (RPM + MARCHA + ACELERADOR) ---
-gs_a = GridSpec(1, 3, width_ratios=[3.0, 0.72, 0.85],
+# --- BANDA A: LO QUE HACE EL PILOTO (RPM + VELOCIDAD + PEDALES) ---
+gs_a = GridSpec(1, 3, width_ratios=[2.6, 0.8, 1.7],
                 left=0.035, right=0.975, top=0.893, bottom=0.712, wspace=0.030)
 
 # A1. Luces de cambio
@@ -385,26 +398,58 @@ ax_rpm.text(2, 0.88, 'RPM', fontsize=9, color=TXT_DIM, va='center')
 txt_rpm = ax_rpm.text(98, 0.55, '--', fontsize=30, fontweight='bold', color=TXT_DIM,
                       ha='right', va='center')
 
-# A2. Marcha: el dato más glanceable de un panel, por eso va a tamaño máximo
-ax_marcha = fig.add_subplot(gs_a[0, 1])
-preparar_panel(ax_marcha, AZUL)
-ax_marcha.text(0.5, 0.88, 'MARCHA', fontsize=9, color=TXT_DIM, ha='center', va='center')
-txt_marcha = ax_marcha.text(0.5, 0.42, '-', fontsize=62, fontweight='bold', color=TXT_DIM,
-                            ha='center', va='center')
+# A2. Velocidad: número grande, hereda el hueco glanceable que dejó la marcha
+ax_vel = fig.add_subplot(gs_a[0, 1])
+preparar_panel(ax_vel, AZUL)
+ax_vel.text(0.5, 0.86, 'VELOCIDAD', fontsize=9, color=TXT_DIM, ha='center', va='center')
+txt_vel = ax_vel.text(0.5, 0.45, '--', fontsize=54, fontweight='bold', color=TXT_DIM,
+                      ha='center', va='center')
+ax_vel.text(0.5, 0.13, 'km/h', fontsize=12, color=TXT_DIM, ha='center', va='center')
 
-# A3. Acelerador
-ax_tps = fig.add_subplot(gs_a[0, 2])
-preparar_panel(ax_tps, AZUL)
-ax_tps.text(0.09, 0.86, 'TPS', fontsize=9, color=TXT_DIM, va='center')
-txt_tps = ax_tps.text(0.93, 0.84, '--', fontsize=20, fontweight='bold', color=TXT_DIM,
-                      ha='right', va='center')
-X_TPS, ANCHO_TPS, Y_TPS, ALTO_TPS = 0.09, 0.84, 0.30, 0.26
-ax_tps.add_patch(Rectangle((X_TPS, Y_TPS), ANCHO_TPS, ALTO_TPS, facecolor=APAGADO))
-bar_tps = Rectangle((X_TPS, Y_TPS), 0, ALTO_TPS, facecolor=AZUL)
-ax_tps.add_patch(bar_tps)
-for pct in (0, 50, 100):
-    x = X_TPS + ANCHO_TPS * pct / 100
-    ax_tps.text(x, 0.22, f'{pct}', fontsize=7, color=TXT_DIM, ha='center', va='top')
+# A3. Traza de pedales: acelerador (verde) y freno (rojo) oscilando de 0 a 100 %,
+# como en la telemetría real. El freno es presión (bar) normalizada a % en pantalla.
+ax_ped = fig.add_subplot(gs_a[0, 2])
+ax_ped.set_facecolor(PANEL)
+for lado in ('top', 'right'):
+    ax_ped.spines[lado].set_visible(False)
+for lado in ('bottom', 'left'):
+    ax_ped.spines[lado].set_color(GRID)
+ax_ped.set_xlim(0, PUNTOS_PEDALES)
+ax_ped.set_ylim(0, 105)
+ax_ped.set_yticks([0, 50, 100])
+ax_ped.set_yticklabels(['0', '50', '100'], fontsize=7)
+ax_ped.set_xticks([0, PUNTOS_PEDALES / 2, PUNTOS_PEDALES])
+ax_ped.set_xticklabels([f'-{VENTANA_PEDALES_SEG:g} s'.replace('.', ','),
+                        f'-{VENTANA_PEDALES_SEG / 2:g} s'.replace('.', ','), 'ahora'], fontsize=7)
+ax_ped.tick_params(length=0, labelsize=7.5)
+ax_ped.grid(True, color=GRID, alpha=0.5, linestyle='--', lw=0.6, zorder=1)
+ax_ped.text(PUNTOS_PEDALES * 0.015, 99, 'PEDALES', fontsize=9, color=TXT_DIM, va='top', zorder=5)
+
+fill_tps = Polygon([[0, 0], [0, 0]], closed=True, facecolor=VERDE, alpha=0.22,
+                   edgecolor='none', zorder=2)
+fill_freno = Polygon([[0, 0], [0, 0]], closed=True, facecolor=ROJO, alpha=0.20,
+                     edgecolor='none', zorder=2)
+ax_ped.add_patch(fill_tps)
+ax_ped.add_patch(fill_freno)
+line_tps, = ax_ped.plot([], [], color=VERDE, lw=2, zorder=4, solid_capstyle='round')
+line_freno, = ax_ped.plot([], [], color=ROJO, lw=2, zorder=3, solid_capstyle='round')
+_caja_ped = dict(facecolor=PANEL, alpha=0.65, edgecolor='none', boxstyle='square,pad=0.2')
+txt_ped_tps = ax_ped.text(PUNTOS_PEDALES * 0.985, 80, 'ACEL --', fontsize=10.5,
+                          fontweight='bold', color=VERDE, ha='right', va='center',
+                          zorder=6, bbox=_caja_ped)
+txt_ped_freno = ax_ped.text(PUNTOS_PEDALES * 0.985, 62, 'FRENO --', fontsize=10.5,
+                            fontweight='bold', color=ROJO, ha='right', va='center',
+                            zorder=6, bbox=_caja_ped)
+
+
+def area_pedales(xs, ys):
+    """Vértices del polígono relleno bajo una curva de pedal, saltándose los NaN
+    (que aparecen al desconectar), para que el relleno no se rompa."""
+    m = np.isfinite(ys)
+    if not m.any():
+        return [[0, 0], [0, 0]]
+    xf, yf = xs[m], ys[m]
+    return [(xf[0], 0)] + list(zip(xf, yf)) + [(xf[-1], 0)]
 
 # --- BANDA B: CANAL CON FOCO (número grande + gráfica) ---
 gs_b = GridSpec(1, 2, width_ratios=[1, 3.3],
@@ -704,7 +749,7 @@ def update(frame):
         txt_hz.set_text('-- Hz')
         txt_hz.set_color(TXT_DIM)
 
-    # --- BANDA A: RPM, MARCHA, TPS ---
+    # --- BANDA A: RPM, VELOCIDAD, PEDALES ---
     valor_rpm = ultima_lectura.get('rpm') if conectado else None
     if valor_rpm is not None:
         valor_rpm = max(0, min(MAX_RPM, valor_rpm))
@@ -726,25 +771,28 @@ def update(frame):
         txt_rpm.set_text('--')
         txt_rpm.set_color(TXT_DIM)
 
-    valor_marcha = ultima_lectura.get('marcha') if conectado else None
-    txt_marcha.set_text(formatear_marcha(valor_marcha))
-    if valor_marcha is None:
-        txt_marcha.set_color(TXT_DIM)
-    elif int(round(valor_marcha)) == VALOR_NEUTRAL:
-        txt_marcha.set_color(VERDE)
-    else:
-        txt_marcha.set_color(TXT)
+    # Velocidad: número grande
+    valor_vel = ultima_lectura.get('velocidad') if conectado else None
+    txt_vel.set_text(formatear('velocidad', valor_vel))
+    txt_vel.set_color(TXT if valor_vel is not None else TXT_DIM)
 
-    valor_tps = ultima_lectura.get('tps') if conectado else None
-    if valor_tps is not None:
-        fraccion = min(max(valor_tps / 100.0, 0.0), 1.0)
-        bar_tps.set_width(ANCHO_TPS * fraccion)
-        txt_tps.set_text(f'{formatear("tps", valor_tps)} %')
-        txt_tps.set_color(TXT)
+    # Traza de pedales: acelerador (0-100 %) y freno (presión -> % de FRENO_PRESION_MAX)
+    serie_tps = np.array(historial['tps'], dtype=float)[-PUNTOS_PEDALES:]
+    serie_freno = np.array(historial['freno_del'], dtype=float)[-PUNTOS_PEDALES:]
+    freno_pct = np.clip(serie_freno / FRENO_PRESION_MAX * 100.0, 0, 100)
+    xs_ped = np.arange(len(serie_tps), dtype=float)
+    line_tps.set_data(xs_ped, serie_tps)
+    line_freno.set_data(xs_ped, freno_pct)
+    fill_tps.set_xy(area_pedales(xs_ped, serie_tps))
+    fill_freno.set_xy(area_pedales(xs_ped, freno_pct))
+
+    val_tps = ultima_lectura.get('tps') if conectado else None
+    val_freno = ultima_lectura.get('freno_del') if conectado else None
+    txt_ped_tps.set_text(f'ACEL {int(round(val_tps))}%' if val_tps is not None else 'ACEL --')
+    if val_freno is not None:
+        txt_ped_freno.set_text(f'FRENO {int(round(min(100.0, val_freno / FRENO_PRESION_MAX * 100)))}%')
     else:
-        bar_tps.set_width(0)
-        txt_tps.set_text('--')
-        txt_tps.set_color(TXT_DIM)
+        txt_ped_freno.set_text('FRENO --')
 
     # --- BANDA C: TARJETAS ---
     alarmas = []

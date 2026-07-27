@@ -28,11 +28,11 @@ while True:
     # Régimen siguiendo al acelerador, con algo de inercia
     rpm = 1200 + 12800 * (carga ** 0.7) + random.uniform(-120, 120)
 
-    # Marcha: sube con el régimen, 0 = punto muerto
-    if rpm < 1500:
-        marcha = 0
-    else:
-        marcha = min(6, 1 + int((rpm - 1500) / 2300))
+    # Velocidad: correlada con el régimen (modelo simple para el simulador)
+    velocidad = 15 + 105 * (carga ** 0.8) + random.uniform(-1.5, 1.5)
+
+    # Freno delantero: presión (bar). Frena al levantar el pie del acelerador
+    freno_del = max(0.0, 45 * max(0.0, min(1.0, (6 - tps) / 6)) + random.uniform(-0.4, 0.4))
 
     # Temperaturas: suben poco a poco y responden a la carga
     ect = 88 + 6 * math.sin(t / 20.0) + 4 * carga + random.uniform(-0.3, 0.3)
@@ -66,7 +66,8 @@ while True:
             'lambda': f'{lambda_val:.3f}',
             'lambda_obj': f'{lambda_obj:.3f}',
             'tps': f'{tps:.0f}',
-            'marcha': f'{marcha}',
+            'velocidad': f'{velocidad:.0f}',
+            'freno_del': f'{freno_del:.1f}',
         }
         mensaje = ';'.join(f'{clave}={valor}' for clave, valor in campos.items())
     else:
