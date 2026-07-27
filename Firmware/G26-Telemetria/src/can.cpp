@@ -1,6 +1,6 @@
 /**
  * @file can.cpp
- * @author Raúl Arcos Herrera
+ * @author Raul Arcos Herrera
  * @brief This file contains the implementation of the CAN Controller class for Link G4+ ECU.
  */
 
@@ -8,8 +8,7 @@
 
 // Volcado en crudo de TODOS los mensajes del bus, a la velocidad a la que
 // llegan. Satura los 115200 baudios y frena la tarea de escucha, asi que solo
-// debe activarse para depurar el bus. Con esto a 1 no se leen las lineas
-// [TRAMA n] del data_processor, que son las utiles para localizar canales
+// debe activarse para depurar el bus.
 #define VOLCADO_CRUDO_CAN 0
 
 static bool driver_installed = false;
@@ -47,7 +46,6 @@ void CAN::start() {
         return;
     }
 
-    // TWAI driver is now successfully installed and started
     driver_installed = true;
 }
 
@@ -69,7 +67,7 @@ void CAN::start_listening_task() {
             "CAN_Listen_Task",    // Task name
             4096,                 // Stack size (words)
             this,                 // Task parameter (this CAN instance)
-            1,                    // Priority (lowered from 5 to 1)
+            1,                    // Priority
             &_listen_task_handle  // Task handle
         );
         
@@ -88,7 +86,6 @@ void CAN::stop_listening_task() {
     if (_listen_task_handle != NULL) {
         _should_stop_listening = true;
         
-        // Wait for task to finish (max 1 second)
         for (int i = 0; i < 100; i++) {
             if (_listen_task_handle == NULL) {
                 break;
@@ -96,7 +93,6 @@ void CAN::stop_listening_task() {
             vTaskDelay(pdMS_TO_TICKS(10));
         }
         
-        // Force delete if still running
         if (_listen_task_handle != NULL) {
             vTaskDelete(_listen_task_handle);
             _listen_task_handle = NULL;
@@ -128,21 +124,17 @@ twai_message_t CAN::createBoolMessage(bool b0, bool b1, bool b2, bool b3, bool b
 void CAN::listen() {
     Serial.println("CAN listening task started");
     
-    // Continuous loop for the thread
     while (!_should_stop_listening) {
         if (!driver_installed) {
-            // Driver not installed
             vTaskDelay(pdMS_TO_TICKS(1000));
             continue;
         }
 
-        // Check if alert happened
         uint32_t alerts_triggered;
-        twai_read_alerts(&alerts_triggered, 0); // Reduced timeout for more responsiveness
+        twai_read_alerts(&alerts_triggered, 0);
         twai_status_info_t twaistatus;
         twai_get_status_info(&twaistatus);
 
-        // Handle alerts
         if (alerts_triggered & TWAI_ALERT_ERR_PASS) {
             Serial.println("Alert: TWAI controller has become error passive.");
         }
@@ -190,8 +182,6 @@ void CAN::listen() {
                 Serial.println("");
 #endif
                 if (!(message.rtr)) {
-
-                    // Send to data processor based on first byte (maintaining original logic)
                     switch (message.data[0]) {
                         case 0:
                             _data_processor->send_serial_frame_0(message.data[1], message.data[2], message.data[3], message.data[4], message.data[5], message.data[6], message.data[7]);
@@ -223,5 +213,5 @@ void CAN::listen() {
     
     Serial.println("CAN listening task ending");
     _listen_task_handle = NULL;
-    vTaskDelete(NULL); // Delete this task
+    vTaskDelete(NULL);
 }
