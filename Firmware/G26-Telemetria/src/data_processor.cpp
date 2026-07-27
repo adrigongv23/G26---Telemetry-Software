@@ -49,15 +49,20 @@ void DataProcessor::send_serial_frame_1(int lmbh, int lmbl, int lmbth, int lmbtl
 }
 
 void DataProcessor::send_serial_frame_2(int shut, int fan, int lmbch, int lmbcl, int brakeh, int brakel, int aux1){
+    float freno = (brakeh * 256) + brakel;
 
+    //Serial.printf("TRAMA: 2\n");
+    //Serial.printf("FRENO: %f\n", freno);
+
+    this->current_freno_del_value = freno;
 }
 
-void DataProcessor::send_serial_frame_3(int aux3, int aux4, int aux5, int aux6, int aux7, int aux8, int dig1){
+void DataProcessor::send_serial_frame_3(int oilth, int oiltl, int oilph, int oilpl, int maph, int mapl, int dig1){
     float tempOil = ((oilth * 256) + oiltl) / 100.0;
     float presionOil = ((oilph * 256) + oilpl) / 100.0;
     float map = ((maph * 256) + mapl) / 100.0;
 
-    //Serial.printf("TRAMA: 2\n");
+    //Serial.printf("TRAMA: 3\n");
     //Serial.printf("TEMP OIL: %f | PRESION OIL: %f | MAP: %f\n", tempOil, presionOil, map);
 
     this->current_taceite_value = tempOil;

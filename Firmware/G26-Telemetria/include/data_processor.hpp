@@ -17,7 +17,7 @@ public:
     volatile float current_vbatt_value = 0.0;
 
     volatile float current_tps_value = 0.0;
-    //volatile int current_marcha_value = 0;
+    volatile float current_freno_del_value = 0.0;  // presion freno delantero, bar (instalado)
     volatile float current_pcomb_value = 0.0;      // bar
     volatile float current_taceite_value = 0.0;    // grados C
     volatile float current_paceite_value = 0.0;    // bar
@@ -25,6 +25,9 @@ public:
     volatile float current_lambda_value = 0.0;
     volatile float current_lambda_obj_value = 0.0;
 
+    // Pendientes de montar/configurar en el coche
+    volatile float current_freno_tra_value = 0.0;  // presion freno trasero, bar
+    volatile float current_velocidad_value = 0.0;  // km/h
 
     //Métodos de recepción de CAN
 

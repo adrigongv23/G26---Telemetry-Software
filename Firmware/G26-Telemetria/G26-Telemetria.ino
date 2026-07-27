@@ -22,21 +22,27 @@ void TaskUdpSender(void *pvParameters){
       float battActual = dataProcessor.current_vbatt_value;
 
       float tpsActual = dataProcessor.current_tps_value;
-      int marchaActual = dataProcessor.current_marcha_value;
+      float frenoDelActual = dataProcessor.current_freno_del_value;   // freno delantero (instalado)
       float pcombActual = dataProcessor.current_pcomb_value;
       float taceiteActual = dataProcessor.current_taceite_value;
       float paceiteActual = dataProcessor.current_paceite_value;
       float mapActual = dataProcessor.current_map_value;
       float lambdaActual = dataProcessor.current_lambda_value;
       float lambdaObjActual = dataProcessor.current_lambda_obj_value;
+      // Pendientes de montar/configurar en el coche. Cuando se instalen, descomentar aquí
+      // y añadir su campo al snprintf; mientras no lleguen, el monitor los muestra como "--".
+      //float velocidadActual = dataProcessor.current_velocidad_value;
+      //float frenoTraActual  = dataProcessor.current_freno_tra_value;   // freno trasero
 
       //Formato "clave=valor" separado por ';'
       char mensaje[256];
       snprintf(mensaje, sizeof(mensaje),
-               "ect=%d;rpm=%d;vbatt=%.2f;tps=%.1f;marcha=%d;"
+               "ect=%d;rpm=%d;vbatt=%.2f;tps=%.1f;freno_del=%.1f;"
                "pcomb=%.2f;taceite=%.1f;paceite=%.2f;map=%.1f;lambda=%.3f;lambda_obj=%.3f",
-               tempActual, rpmActual, battActual, tpsActual, marchaActual,
+               tempActual, rpmActual, battActual, tpsActual, frenoDelActual,
                pcombActual, taceiteActual, paceiteActual, mapActual, lambdaActual, lambdaObjActual);
+      // Al añadir los pendientes: sumar ";velocidad=%.0f;freno_tra=%.1f" al formato
+      // y velocidadActual, frenoTraActual al final de los argumentos.
 
       //Enviamos el paquete por broadcast a toda la red local (no hace falta conocer la IP del portátil)
       udp.beginPacket(IPAddress(255,255,255,255), UDP_PORT);
