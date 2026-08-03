@@ -1953,11 +1953,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\alvar\\Desktop\\Barcelona_software\\AARadio_bluetooth\\App_radio\\App_radio.csproj",
+      "projectUniqueName": "C:\\Users\\alvar\\Desktop\\hkuobb\\G26---Telemetry-Software\\Radio\\App_radio\\App_radio.csproj",
       "projectName": "App_radio",
-      "projectPath": "C:\\Users\\alvar\\Desktop\\Barcelona_software\\AARadio_bluetooth\\App_radio\\App_radio.csproj",
+      "projectPath": "C:\\Users\\alvar\\Desktop\\hkuobb\\G26---Telemetry-Software\\Radio\\App_radio\\App_radio.csproj",
       "packagesPath": "C:\\Users\\alvar\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\alvar\\Desktop\\Barcelona_software\\AARadio_bluetooth\\App_radio\\obj\\",
+      "outputPath": "C:\\Users\\alvar\\Desktop\\hkuobb\\G26---Telemetry-Software\\Radio\\App_radio\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\alvar\\AppData\\Roaming\\NuGet\\NuGet.Config",
