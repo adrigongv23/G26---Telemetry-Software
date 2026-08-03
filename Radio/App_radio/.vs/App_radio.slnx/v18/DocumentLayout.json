@@ -1,0 +1,85 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\alvar\\Desktop\\Barcelona_software\\AARadio_bluetooth\\App_radio\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{7CFA4CBA-C3C7-53E8-BAB7-F6260C1F73C8}|App_radio.csproj|c:\\users\\alvar\\desktop\\barcelona_software\\aaradio_bluetooth\\app_radio\\audioengine.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7CFA4CBA-C3C7-53E8-BAB7-F6260C1F73C8}|App_radio.csproj|solutionrelative:audioengine.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7CFA4CBA-C3C7-53E8-BAB7-F6260C1F73C8}|App_radio.csproj|c:\\users\\alvar\\desktop\\barcelona_software\\aaradio_bluetooth\\app_radio\\radioserialservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7CFA4CBA-C3C7-53E8-BAB7-F6260C1F73C8}|App_radio.csproj|solutionrelative:radioserialservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7CFA4CBA-C3C7-53E8-BAB7-F6260C1F73C8}|App_radio.csproj|c:\\users\\alvar\\desktop\\barcelona_software\\aaradio_bluetooth\\app_radio\\radiocontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7CFA4CBA-C3C7-53E8-BAB7-F6260C1F73C8}|App_radio.csproj|solutionrelative:radiocontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7CFA4CBA-C3C7-53E8-BAB7-F6260C1F73C8}|App_radio.csproj|c:\\users\\alvar\\desktop\\barcelona_software\\aaradio_bluetooth\\app_radio\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{7CFA4CBA-C3C7-53E8-BAB7-F6260C1F73C8}|App_radio.csproj|solutionrelative:program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 1,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "RadioSerialService.cs",
+              "DocumentMoniker": "C:\\Users\\alvar\\Desktop\\Barcelona_software\\AARadio_bluetooth\\App_radio\\RadioSerialService.cs",
+              "RelativeDocumentMoniker": "RadioSerialService.cs",
+              "ToolTip": "C:\\Users\\alvar\\Desktop\\Barcelona_software\\AARadio_bluetooth\\App_radio\\RadioSerialService.cs",
+              "RelativeToolTip": "RadioSerialService.cs",
+              "ViewState": "AgIAAPIAAAAAAAAAAAAswAcBAAAJAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-07-23T17:01:10.725Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "AudioEngine.cs",
+              "DocumentMoniker": "C:\\Users\\alvar\\Desktop\\Barcelona_software\\AARadio_bluetooth\\App_radio\\AudioEngine.cs",
+              "RelativeDocumentMoniker": "AudioEngine.cs",
+              "ToolTip": "C:\\Users\\alvar\\Desktop\\Barcelona_software\\AARadio_bluetooth\\App_radio\\AudioEngine.cs",
+              "RelativeToolTip": "AudioEngine.cs",
+              "ViewState": "AgIAAE0AAAAAAAAAAAAgwGEAAAASAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-07-23T16:52:37.679Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "Program.cs",
+              "DocumentMoniker": "C:\\Users\\alvar\\Desktop\\Barcelona_software\\AARadio_bluetooth\\App_radio\\Program.cs",
+              "RelativeDocumentMoniker": "Program.cs",
+              "ToolTip": "C:\\Users\\alvar\\Desktop\\Barcelona_software\\AARadio_bluetooth\\App_radio\\Program.cs",
+              "RelativeToolTip": "Program.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA8AAAAFAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-07-23T16:51:47.037Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "RadioController.cs",
+              "DocumentMoniker": "C:\\Users\\alvar\\Desktop\\Barcelona_software\\AARadio_bluetooth\\App_radio\\RadioController.cs",
+              "RelativeDocumentMoniker": "RadioController.cs",
+              "ToolTip": "C:\\Users\\alvar\\Desktop\\Barcelona_software\\AARadio_bluetooth\\App_radio\\RadioController.cs",
+              "RelativeToolTip": "RadioController.cs",
+              "ViewState": "AgIAAPAAAAAAAAAAAAAawAIBAAAlAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-07-23T16:51:43.945Z"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

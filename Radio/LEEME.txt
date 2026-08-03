@@ -1,0 +1,134 @@
+VERSION V5 - CORRECCION V6 PRO+
+
+Esta version corrige dos problemas observados en el monitor serie:
+- Acepta el comando propietario AT +SUGCODEC=1 con OK.
+- No vuelve a lanzar esp_hf_ag_slc_connect mientras RFCOMM/SLC sigue negociando.
+
+La conexion completa se confirma SOLO al aparecer:
+  *** SLC_CONNECTED: control HFP listo. ***
+
+Despues debe aparecer:
+  *** AUDIO CONECTADO: CVSD 8 kHz ... ***
+
+VERSION V4 - AJUSTADA AL INTERCOM DETECTADO
+
+Intercom detectado: V6 Pro+
+MAC Bluetooth Classic: 00:12:6F:60:F2:98
+
+Esta version intenta conectar directamente con esa MAC, sin esperar a que el nombre coincida con EJEAS/V4.
+
+VERSION V3 - CORRECCION ARDUINO-ESP32 3.3.11
+================================================
+
+Esta version incluye esp32-hal-alloc-bt-classic-mem.h para impedir que
+Arduino libere la memoria de Bluetooth Classic antes de ejecutar setup().
+Corrige el mensaje:
+  ERROR: btStartMode(BT_MODE_CLASSIC_BT) ha fallado.
+
+VERSION CORREGIDA PARA ARDUINO-ESP32 3.3.11
+- Corregida incompatibilidad const de esp_bd_addr_t con la API HFP AG.
+
+PRUEBA EJEAS V4 PLUS + ESP32-AUDIO-KIT V2.2 / ESP32-A1S
+========================================================
+
+QUE HACE
+--------
+El ESP32 actua como un telefono Bluetooth HFP Audio Gateway. Busca el EJEAS,
+lo empareja, simula una llamada y abre el audio de voz SCO/eSCO.
+
+No usa el ES8388, los jacks de audio, UART2, ESP-NOW ni la aplicacion del PC.
+Es una prueba aislada para confirmar que el EJEAS acepta al ESP32 como telefono
+y que el audio HFP llega al programa.
+
+REQUISITO IMPORTANTE
+--------------------
+Arduino IDE -> Gestor de placas:
+  esp32 by Espressif Systems 3.3.8 o posterior
+
+Placa recomendada:
+  Herramientas -> Placa -> ESP32 Arduino -> ESP32 Dev Module
+
+Ajustes recomendados:
+  Upload Speed: 921600 o 460800
+  CPU Frequency: 240 MHz
+  Flash Frequency: 80 MHz
+  Flash Mode: QIO
+  Flash Size: 4 MB
+  Partition Scheme: Default 4MB with spiffs
+  PSRAM: Disabled
+  Puerto: el COM de la ESP32-Audio-Kit
+
+PASOS
+-----
+1. Apaga el Bluetooth del movil que normalmente usa el EJEAS.
+2. Si el EJEAS intenta reconectarse al movil, elimina temporalmente esa conexion
+   o aleja/apaga el movil.
+3. Pon el EJEAS V4 Plus en modo de emparejamiento CON TELEFONO. No uses el modo
+   de emparejamiento entre dos intercoms.
+4. Abre Prueba_EJEAS_HFP_AG.ino con Arduino IDE.
+5. Selecciona ESP32 Dev Module y carga el programa.
+6. Abre el monitor serie a 115200 baudios.
+7. Deben aparecer, en este orden aproximado:
+
+   Encontrado: ... nombre="EJEAS..." o "V4..."
+   Emparejamiento correcto
+   HFP conexion: SLC_CONNECTED
+   Audio HFP: CONNECTED_CVSD_8_KHZ o CONNECTED_MSBC_16_KHZ
+
+8. El modo inicial es LOOPBACK. Habla por el microfono del casco: deberias oir
+   tu propia voz con un pequeno retardo.
+9. Escribe t en el monitor serie para escuchar un tono de 1 kHz.
+10. Escribe l para volver al retorno del microfono.
+
+COMANDOS
+--------
+h  ayuda
+s  repetir busqueda Bluetooth
+c  conectar HFP a la MAC guardada
+a  simular llamada activa y abrir audio
+o  abrir solamente SCO
+l  loopback del microfono
+t  tono de 1 kHz
+x  cerrar audio y finalizar llamada
+d  desconectar el intercom
+b  borrar MAC y emparejamiento
+i  mostrar estado
+
+SI NO ENCUENTRA EL NOMBRE
+-------------------------
+El monitor serie imprime todos los dispositivos encontrados. Si ves el EJEAS
+pero su nombre no contiene EJEAS ni V4, agrega ese texto al array TARGET_WORDS
+del principio del .ino.
+
+Tambien puedes fijar su MAC:
+
+  static constexpr bool USE_FIXED_MAC = true;
+  static const uint8_t FIXED_MAC[6] = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF};
+
+Sustituye los bytes por la MAC que aparece en el monitor serie.
+
+SI DA ERROR DE CONFIG_BT_HFP_AUDIO_DATA_PATH_HCI
+------------------------------------------------
+La version de esp32 by Espressif Systems es antigua o sus librerias no tienen
+Voice-over-HCI. Actualiza el paquete a 3.3.8 o posterior.
+
+QUE LOG NECESITO PARA CORREGIRLO
+--------------------------------
+Copia desde la primera linea de arranque hasta 10 segundos despues del fallo.
+Los mensajes mas importantes son:
+
+  esp_hf_ag_init
+  Estado de busqueda
+  Emparejamiento correcto/error
+  HFP conexion
+  SLC_CONNECTED
+  Audio HFP
+  AUDIO [CVSD8k/...]
+
+LIMITACION DE ESTA PRUEBA
+-------------------------
+El codigo esta preparado a partir de las APIs oficiales de Espressif, pero no
+se puede confirmar desde fuera que el firmware concreto del EJEAS mantenga SCO
+abierto sin una llamada real. La llamada simulada esta incluida precisamente
+para comprobarlo. Si SLC conecta pero SCO no, el log permitira ajustar la
+secuencia de llamada que espera el EJEAS.
